@@ -16,7 +16,7 @@ class SklearnLinearBackend:
     def supports(cls, model: object) -> bool:
         return isinstance(model, (LinearRegression, LogisticRegression))
 
-    def __init__(self, model: object) -> None:
+    def __init__(self, model: object, *, n_steps: int = 64) -> None:
         if not self.supports(model):
             raise TypeError("SklearnLinearBackend received an unsupported model")
         if not hasattr(model, "coef_"):
@@ -47,4 +47,3 @@ class SklearnLinearBackend:
         base_values = baseline @ coefficients.T + intercept
         output_names: Optional[Sequence[str]] = [str(i) for i in range(coefficients.shape[0])]
         return values, base_values, output_names
-
