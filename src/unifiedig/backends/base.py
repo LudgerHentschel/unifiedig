@@ -1,6 +1,6 @@
 """Contract implemented by model-family-specific attribution backends."""
 
-from typing import NamedTuple, Optional, Protocol, Sequence
+from typing import Any, NamedTuple, Optional, Protocol, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -25,8 +25,6 @@ class Backend(Protocol):
 
     def __init__(self, model: object, *, n_steps: int = 64) -> None: ...
 
-    def explain(
-        self, data: NDArray[np.floating], baseline: NDArray[np.floating]
-    ) -> BackendResult:
+    def explain(self, data: Any, baseline: Any) -> BackendResult:
         """Return attribution values, baseline outputs, and output names."""
         ...

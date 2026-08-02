@@ -26,17 +26,18 @@ class Explanation:
         values = np.asarray(self.values)
         data = np.asarray(self.data)
         base_values = np.asarray(self.base_values)
-        if data.ndim != 2:
-            raise ValueError("data must have shape (samples, features)")
-        if values.ndim not in (2, 3) or values.shape[:2] != data.shape:
+        if data.ndim < 2:
+            raise ValueError("data must have a leading sample dimension")
+        scalar_output = values.shape == data.shape
+        multi_output = values.ndim == data.ndim + 1 and values.shape[:-1] == data.shape
+        if not scalar_output and not multi_output:
             raise ValueError(
-                "values must have shape (samples, features) or "
-                "(samples, features, outputs)"
+                "values must match data or add one trailing output dimension"
             )
         expected_base_shape = (
             (data.shape[0],)
-            if values.ndim == 2
-            else (data.shape[0], values.shape[2])
+            if scalar_output
+            else (data.shape[0], values.shape[-1])
         )
         if base_values.shape != expected_base_shape:
             raise ValueError(f"base_values must have shape {expected_base_shape}")

@@ -9,11 +9,11 @@ explanation = unifiedig.Explainer(model, baseline)(data)
 
 ## Inputs and baselines
 
-`data` is one sample with shape `(features,)` or a batch with shape
-`(samples, features)`. Unified IG always stores it as a two-dimensional float
-array. A baseline may be a scalar, a feature vector, one matrix row, or one row
-per input sample. Unified IG—not individual backends—validates and broadcasts
-the baseline to match the input matrix.
+For sklearn, `data` is one sample with shape `(features,)` or a batch with shape
+`(samples, features)`. PyTorch additionally accepts structured single-tensor
+inputs with any shape `(samples, ...)`. A baseline may be a scalar, one sample,
+one batch row, or one row per input sample. Unified IG—not individual
+backends—validates and broadcasts the baseline to match the input.
 
 Integrated Gradients follows the straight-line path from each normalized
 baseline row to its corresponding data row.
@@ -22,9 +22,9 @@ baseline row to its corresponding data row.
 
 For a scalar model output:
 
-- `values`: `(samples, features)`
+- `values`: the same shape as `data`
 - `base_values`: `(samples,)`
-- `data`: `(samples, features)`
+- `data`: `(samples, ...)`
 
 For multiple model outputs:
 

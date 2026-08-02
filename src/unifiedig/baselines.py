@@ -52,3 +52,62 @@ def normalize_inputs(data: Any, baseline: Any) -> Tuple[NDArray[np.floating], ND
     )
     return normalized_data, normalized_baseline
 
+
+def normalize_torch_inputs(
+    data: Any, baseline: Any, *, device: Any, dtype: Any
+) -> Tuple[Any, Any]:
+    """Normalize one PyTorch tensor input and baseline on the model's device."""
+
+    try:
+        import torch
+    except ImportError as exc:  # pragma: no cover - selected only with PyTorch present
+        raise ImportError(
+            "PyTorch support is optional. Install it with `pip install unifiedig[torch]`."
+        ) from exc
+
+    data_source = data.to_numpy() if hasattr(data, "to_numpy") else data
+    normalized_data = torch.as_tensor(
+        data_source, device=device, dtype=dtype
+    ).detach()
+    if normalized_data.ndim == 1:
+        normalized_data = normalized_data.reshape(1, -1)
+    if normalized_data.ndim < 2 or normalized_data.shape[0] == 0:
+        raise ValueError("data must contain a non-empty leading sample dimension")
+    if not torch.isfinite(normalized_data).all():
+        raise ValueError("data must contain only finite values")
+
+    baseline_source = (
+        baseline.to_numpy() if hasattr(baseline, "to_numpy") else baseline
+    )
+    normalized_baseline = torch.as_tensor(
+        baseline_source,
+        device=normalized_data.device,
+        dtype=normalized_data.dtype,
+    ).detach()
+    sample_shape = normalized_data.shape[1:]
+    if normalized_baseline.ndim == 0:
+        normalized_baseline = torch.full(
+            (1, *sample_shape),
+            normalized_baseline.item(),
+            device=normalized_data.device,
+            dtype=normalized_data.dtype,
+        )
+    elif tuple(normalized_baseline.shape) == tuple(sample_shape):
+        normalized_baseline = normalized_baseline.unsqueeze(0)
+    elif (
+        normalized_baseline.ndim != normalized_data.ndim
+        or tuple(normalized_baseline.shape[1:]) != tuple(sample_shape)
+    ):
+        raise ValueError(
+            "baseline must be scalar, have the input sample shape, or have one "
+            "matching row per sample"
+        )
+
+    if normalized_baseline.shape[0] not in (1, normalized_data.shape[0]):
+        raise ValueError("baseline must contain either one row or one row per sample")
+    if not torch.isfinite(normalized_baseline).all():
+        raise ValueError("baseline must contain only finite values")
+    normalized_baseline = torch.broadcast_to(
+        normalized_baseline, normalized_data.shape
+    ).clone()
+    return normalized_data, normalized_baseline

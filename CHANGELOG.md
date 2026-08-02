@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0.dev2
+
+- Add optional PyTorch support through Captum Integrated Gradients.
+- Preserve model device, floating-point dtype, and training/evaluation state.
+- Support tabular and structured single-tensor inputs with scalar outputs.
+- Keep PyTorch and Captum out of the core installation.
+
 ## 0.1.0.dev1
 
 - Add completeness-error diagnostics and numerical-accuracy warnings.

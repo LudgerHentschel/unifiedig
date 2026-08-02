@@ -87,7 +87,7 @@ def test_unfitted_supported_model_is_rejected():
 
 
 def test_explanation_rejects_inconsistent_parallel_array_shapes():
-    with pytest.raises(ValueError, match="values must have shape"):
+    with pytest.raises(ValueError, match="values must match data"):
         uig.Explanation(
             values=np.zeros((2, 3)),
             base_values=np.zeros(2),

@@ -7,7 +7,8 @@ examples, benchmarks, and guarded releases.
 
 ## 0.1.0.dev2 — PyTorch
 
-Optional PyTorch and Captum integration behind the existing `Explainer` API.
+Optional PyTorch and Captum integration behind the existing `Explainer` API,
+with raw scalar-output semantics and structured single-tensor inputs.
 
 ## 0.1.0.dev3 — trees
 

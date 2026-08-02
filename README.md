@@ -52,6 +52,19 @@ linear, logistic, MLP regression, and MLP classification programs.
 - Binary `sklearn.linear_model.LogisticRegression` (closed form)
 - `sklearn.neural_network.MLPRegressor` (analytic gradients and quadrature)
 - Binary `sklearn.neural_network.MLPClassifier` (analytic logit gradients and quadrature)
+- PyTorch modules with one raw scalar output per sample (Captum, optional)
+
+Install PyTorch support separately so the core package remains lightweight:
+
+```console
+pip install "unifiedig[torch]"
+```
+
+PyTorch models may accept tabular or structured single-tensor inputs. Unified IG
+preserves the model's device and floating-point dtype, temporarily evaluates the
+model in inference mode, and restores every module's prior training state. V1
+expects one raw scalar output per sample. For binary classification that output
+must be the logit, not a sigmoid probability.
 
 ## Development
 

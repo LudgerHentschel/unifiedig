@@ -6,12 +6,16 @@ from typing import Any, Optional, Sequence, Type
 
 import numpy as np
 
-from .backends import Backend, SklearnLinearBackend, SklearnMLPBackend
-from .baselines import normalize_inputs
+from .backends import Backend, PyTorchBackend, SklearnLinearBackend, SklearnMLPBackend
+from .baselines import normalize_inputs, normalize_torch_inputs
 from .explanation import Explanation
 
 
-_BACKENDS: Sequence[Type[Backend]] = (SklearnLinearBackend, SklearnMLPBackend)
+_BACKENDS: Sequence[Type[Backend]] = (
+    SklearnLinearBackend,
+    SklearnMLPBackend,
+    PyTorchBackend,
+)
 
 
 class Explainer:
@@ -52,9 +56,23 @@ class Explainer:
 
     def __call__(self, data: Any) -> Explanation:
         feature_names = self._feature_names(data)
-        normalized_data, normalized_baseline = normalize_inputs(data, self.baseline)
+        if getattr(self._backend, "input_kind", "numpy") == "torch":
+            normalized_data, normalized_baseline = normalize_torch_inputs(
+                data,
+                self.baseline,
+                device=self._backend.device,
+                dtype=self._backend.dtype,
+            )
+            explanation_data = normalized_data.detach().cpu().numpy()
+        else:
+            normalized_data, normalized_baseline = normalize_inputs(data, self.baseline)
+            explanation_data = normalized_data
         backend_result = self._backend.explain(normalized_data, normalized_baseline)
-        attributed_difference = backend_result.values.sum(axis=1)
+        if backend_result.output_values.ndim == 1:
+            attribution_axes = tuple(range(1, backend_result.values.ndim))
+        else:
+            attribution_axes = tuple(range(1, backend_result.values.ndim - 1))
+        attributed_difference = backend_result.values.sum(axis=attribution_axes)
         completeness_error = backend_result.output_values - (
             attributed_difference + backend_result.base_values
         )
@@ -78,7 +96,7 @@ class Explainer:
         return Explanation(
             values=backend_result.values,
             base_values=backend_result.base_values,
-            data=normalized_data,
+            data=explanation_data,
             feature_names=feature_names,
             output_names=backend_result.output_names,
             completeness_error=completeness_error,
