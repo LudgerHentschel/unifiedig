@@ -53,12 +53,22 @@ linear, logistic, MLP regression, and MLP classification programs.
 - `sklearn.neural_network.MLPRegressor` (analytic gradients and quadrature)
 - Binary `sklearn.neural_network.MLPClassifier` (analytic logit gradients and quadrature)
 - PyTorch modules with one raw scalar output per sample (Captum, optional)
+- TreeIG-supported sklearn, XGBoost, and LightGBM trees (exact, optional)
 
 Install PyTorch support separately so the core package remains lightweight:
 
 ```console
 pip install "unifiedig[torch]"
 ```
+
+Install exact tree-model support separately:
+
+```console
+pip install "unifiedig[trees]"
+```
+
+Tree attributions are computed by TreeIG; Unified IG normalizes the input and
+baseline and adapts TreeIG's exact result to `Explanation`.
 
 PyTorch models may accept tabular or structured single-tensor inputs. Unified IG
 preserves the model's device and floating-point dtype, temporarily evaluates the

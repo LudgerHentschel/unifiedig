@@ -45,13 +45,22 @@ class PyTorchBackend:
         self.model.eval()
         try:
             output_values = self._output(data)
-            base_values = self._output(baseline)
-            attributions = self._integrated_gradients.attribute(
-                data,
-                baselines=baseline,
-                n_steps=self.n_steps,
-                method="gausslegendre",
-            )
+            mean_base_value = self._output(baseline).mean()
+            base_values = mean_base_value.expand(data.shape[0]).clone()
+            attributions = None
+            for baseline_row in baseline:
+                contribution = self._integrated_gradients.attribute(
+                    data,
+                    baselines=baseline_row.unsqueeze(0),
+                    n_steps=self.n_steps,
+                    method="gausslegendre",
+                )
+                if attributions is None:
+                    attributions = contribution
+                else:
+                    attributions += contribution
+            assert attributions is not None
+            attributions /= baseline.shape[0]
         finally:
             for module, training in module_states.items():
                 module.training = training

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0.dev3
+
+- Add an optional exact tree-model backend powered entirely by TreeIG.
+- Treat baseline matrices as shared distributions for every model family.
+- Keep binary tree classification attribution on the raw decision-score scale.
+
 ## 0.1.0.dev2
 
 - Add optional PyTorch support through Captum Integrated Gradients.

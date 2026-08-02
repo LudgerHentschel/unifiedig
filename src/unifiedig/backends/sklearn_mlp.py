@@ -41,26 +41,40 @@ class SklearnMLPBackend:
         if data.shape[1] != self.model.n_features_in_:
             raise ValueError(f"data must have {self.model.n_features_in_} features")
 
-        difference = data - baseline
-        integrated_gradient: Optional[FloatArray] = None
-        for node, weight in zip(self._nodes, self._weights):
-            path_data = baseline + node * difference
-            gradient = self._input_gradient(path_data)
-            if integrated_gradient is None:
-                integrated_gradient = weight * gradient
-            else:
-                integrated_gradient += weight * gradient
+        values: Optional[FloatArray] = None
+        for baseline_row in baseline:
+            difference = data - baseline_row
+            integrated_gradient: Optional[FloatArray] = None
+            for node, weight in zip(self._nodes, self._weights):
+                path_data = baseline_row + node * difference
+                gradient = self._input_gradient(path_data)
+                if integrated_gradient is None:
+                    integrated_gradient = weight * gradient
+                else:
+                    integrated_gradient += weight * gradient
 
-        assert integrated_gradient is not None
-        base_values = self._explained_output(baseline)
+            assert integrated_gradient is not None
+            if integrated_gradient.shape[-1] == 1:
+                baseline_values = difference * integrated_gradient[..., 0]
+            else:
+                baseline_values = difference[:, :, None] * integrated_gradient
+            if values is None:
+                values = baseline_values
+            else:
+                values += baseline_values
+
+        assert values is not None
+        values /= baseline.shape[0]
+        mean_base_value = self._explained_output(baseline).mean(axis=0)
+        base_values = np.broadcast_to(
+            mean_base_value, (data.shape[0], mean_base_value.size)
+        ).copy()
         output_values = self._explained_output(data)
-        if integrated_gradient.shape[-1] == 1:
-            values = difference * integrated_gradient[..., 0]
+        if output_values.shape[-1] == 1:
             return BackendResult(
                 values, base_values[:, 0], output_values[:, 0], self._output_names()
             )
 
-        values = difference[:, :, None] * integrated_gradient
         return BackendResult(values, base_values, output_values, self._output_names())
 
     def _forward_hidden(self, data: FloatArray) -> Tuple[FloatArray, List[FloatArray]]:

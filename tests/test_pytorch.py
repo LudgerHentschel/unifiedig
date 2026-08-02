@@ -38,11 +38,13 @@ def test_torch_nonlinear_binary_logit_is_complete():
         torch.nn.Linear(2, 4), torch.nn.Tanh(), torch.nn.Linear(4, 1)
     )
     data = torch.tensor([[0.4, -0.2], [-0.5, 0.7]])
-    baselines = torch.tensor([[0.0, 0.0], [0.1, -0.1]])
+    baselines = torch.tensor([[0.0, 0.0], [0.1, -0.1], [-0.2, 0.3]])
 
     result = uig.Explainer(model, baselines, n_steps=64)(data)
 
     logits = model(data).detach().numpy()[:, 0]
+    expected_base_value = model(baselines).detach().numpy()[:, 0].mean()
+    np.testing.assert_allclose(result.base_values, expected_base_value)
     np.testing.assert_allclose(
         result.values.sum(axis=1) + result.base_values,
         logits,

@@ -114,7 +114,7 @@ def test_supported_hidden_activations_are_complete(activation):
     )
 
 
-def test_per_sample_baselines_work_for_deep_mlp():
+def test_baseline_distribution_is_shared_for_deep_mlp():
     rng = np.random.default_rng(8)
     training = rng.normal(size=(50, 2))
     model = MLPRegressor(
@@ -125,11 +125,11 @@ def test_per_sample_baselines_work_for_deep_mlp():
         random_state=3,
     ).fit(training, training[:, 0] - training[:, 1] ** 2)
     data = np.array([[0.5, 0.2], [-0.4, 0.7]])
-    baselines = np.array([[0.0, 0.0], [0.2, -0.1]])
+    baselines = np.array([[0.0, 0.0], [0.2, -0.1], [-0.3, 0.4]])
 
     result = uig.Explainer(model, baselines)(data)
 
-    np.testing.assert_allclose(result.base_values, model.predict(baselines))
+    np.testing.assert_allclose(result.base_values, model.predict(baselines).mean())
     assert result.max_abs_completeness_error < 1e-7
 
 

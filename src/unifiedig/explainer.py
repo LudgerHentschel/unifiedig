@@ -6,7 +6,13 @@ from typing import Any, Optional, Sequence, Type
 
 import numpy as np
 
-from .backends import Backend, PyTorchBackend, SklearnLinearBackend, SklearnMLPBackend
+from .backends import (
+    Backend,
+    PyTorchBackend,
+    SklearnLinearBackend,
+    SklearnMLPBackend,
+    TreeIGBackend,
+)
 from .baselines import normalize_inputs, normalize_torch_inputs
 from .explanation import Explanation
 
@@ -14,6 +20,7 @@ from .explanation import Explanation
 _BACKENDS: Sequence[Type[Backend]] = (
     SklearnLinearBackend,
     SklearnMLPBackend,
+    TreeIGBackend,
     PyTorchBackend,
 )
 

@@ -20,9 +20,9 @@ def normalize_data(data: Any) -> NDArray[np.floating]:
 
 
 def normalize_baseline(
-    baseline: Any, *, n_samples: int, n_features: int
+    baseline: Any, *, n_features: int
 ) -> NDArray[np.floating]:
-    """Broadcast a scalar, feature vector, or baseline matrix over samples."""
+    """Normalize a scalar, feature vector, or shared baseline distribution."""
 
     array = np.asarray(baseline, dtype=float)
     if array.ndim == 0:
@@ -32,22 +32,23 @@ def normalize_baseline(
             raise ValueError(f"baseline must have {n_features} features")
         array = array.reshape(1, -1)
     elif array.ndim != 2 or array.shape[1] != n_features:
-        raise ValueError(f"baseline must have shape ({n_features},), (1, {n_features}), or (n_samples, {n_features})")
-
-    if array.shape[0] not in (1, n_samples):
-        raise ValueError("baseline must contain either one row or one row per sample")
+        raise ValueError(
+            f"baseline must have shape ({n_features},) or "
+            f"(n_baselines, {n_features})"
+        )
+    if array.shape[0] == 0:
+        raise ValueError("baseline distribution must contain at least one row")
     if not np.isfinite(array).all():
         raise ValueError("baseline must contain only finite values")
-    return np.broadcast_to(array, (n_samples, n_features)).copy()
+    return np.ascontiguousarray(array)
 
 
 def normalize_inputs(data: Any, baseline: Any) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
-    """Normalize data and its baseline into matching sample matrices."""
+    """Normalize data and a baseline distribution into separate matrices."""
 
     normalized_data = normalize_data(data)
     normalized_baseline = normalize_baseline(
         baseline,
-        n_samples=normalized_data.shape[0],
         n_features=normalized_data.shape[1],
     )
     return normalized_data, normalized_baseline
@@ -56,7 +57,7 @@ def normalize_inputs(data: Any, baseline: Any) -> Tuple[NDArray[np.floating], ND
 def normalize_torch_inputs(
     data: Any, baseline: Any, *, device: Any, dtype: Any
 ) -> Tuple[Any, Any]:
-    """Normalize one PyTorch tensor input and baseline on the model's device."""
+    """Normalize PyTorch inputs and a shared baseline distribution."""
 
     try:
         import torch
@@ -99,15 +100,12 @@ def normalize_torch_inputs(
         or tuple(normalized_baseline.shape[1:]) != tuple(sample_shape)
     ):
         raise ValueError(
-            "baseline must be scalar, have the input sample shape, or have one "
-            "matching row per sample"
+            "baseline must be scalar, have the input sample shape, or be a "
+            "baseline distribution with matching sample shape"
         )
 
-    if normalized_baseline.shape[0] not in (1, normalized_data.shape[0]):
-        raise ValueError("baseline must contain either one row or one row per sample")
+    if normalized_baseline.shape[0] == 0:
+        raise ValueError("baseline distribution must contain at least one row")
     if not torch.isfinite(normalized_baseline).all():
         raise ValueError("baseline must contain only finite values")
-    normalized_baseline = torch.broadcast_to(
-        normalized_baseline, normalized_data.shape
-    ).clone()
     return normalized_data, normalized_baseline

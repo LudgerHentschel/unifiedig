@@ -30,25 +30,29 @@ class SklearnLinearBackend:
     ) -> BackendResult:
         coefficients = np.asarray(self.model.coef_, dtype=float)
         intercept = np.asarray(self.model.intercept_, dtype=float)
+        mean_baseline = baseline.mean(axis=0)
 
         if isinstance(self.model, LogisticRegression):
             weights = coefficients.reshape(-1)
-            values = (data - baseline) * weights
-            base_values = baseline @ weights + intercept.reshape(-1)[0]
+            values = (data - mean_baseline) * weights
+            base_value = mean_baseline @ weights + intercept.reshape(-1)[0]
+            base_values = np.full(data.shape[0], base_value)
             output_values = data @ weights + intercept.reshape(-1)[0]
             return BackendResult(
                 values, base_values, output_values, [str(self.model.classes_[1])]
             )
 
         if coefficients.ndim == 1:
-            values = (data - baseline) * coefficients
-            base_values = baseline @ coefficients + intercept.reshape(-1)[0]
+            values = (data - mean_baseline) * coefficients
+            base_value = mean_baseline @ coefficients + intercept.reshape(-1)[0]
+            base_values = np.full(data.shape[0], base_value)
             output_values = data @ coefficients + intercept.reshape(-1)[0]
             return BackendResult(values, base_values, output_values, None)
 
         # Multi-output regression: (samples, features, outputs).
-        values = (data - baseline)[:, :, None] * coefficients.T[None, :, :]
-        base_values = baseline @ coefficients.T + intercept
+        values = (data - mean_baseline)[:, :, None] * coefficients.T[None, :, :]
+        base_value = mean_baseline @ coefficients.T + intercept
+        base_values = np.broadcast_to(base_value, (data.shape[0], base_value.size)).copy()
         output_values = data @ coefficients.T + intercept
         output_names: Optional[Sequence[str]] = [str(i) for i in range(coefficients.shape[0])]
         return BackendResult(values, base_values, output_values, output_names)

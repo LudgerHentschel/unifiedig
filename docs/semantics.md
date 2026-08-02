@@ -12,11 +12,12 @@ explanation = unifiedig.Explainer(model, baseline)(data)
 For sklearn, `data` is one sample with shape `(features,)` or a batch with shape
 `(samples, features)`. PyTorch additionally accepts structured single-tensor
 inputs with any shape `(samples, ...)`. A baseline may be a scalar, one sample,
-one batch row, or one row per input sample. Unified IG—not individual
-backends—validates and broadcasts the baseline to match the input.
+or a baseline distribution with shape `(baselines, ...)`. Unified IG—not
+individual backends—validates the baseline distribution.
 
-Integrated Gradients follows the straight-line path from each normalized
-baseline row to its corresponding data row.
+Every input is attributed from the same baseline distribution. Unified IG
+averages its Integrated Gradients paths over the distribution; it never infers
+row pairing from equal input and baseline counts.
 
 ## Explanation arrays
 
@@ -53,6 +54,9 @@ sum(values over features) + base_values = explained model output
 Closed-form backends satisfy this up to floating-point arithmetic. Numerical
 backends approximate the path integral and document their integration method;
 their completeness tests use an explicit numerical tolerance.
+
+Supported tree models are delegated to TreeIG, which computes their path
+attributions exactly and applies the same shared-distribution semantics.
 
 `Explanation.completeness_error` stores the signed residual between the model
 output and the reconstructed output. `max_abs_completeness_error` summarizes

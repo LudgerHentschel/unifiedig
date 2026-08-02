@@ -28,14 +28,15 @@ def test_scalar_baseline_and_single_sample_are_normalized():
     np.testing.assert_allclose(result.values.sum(axis=1) + result.base_values, model.predict(result.data))
 
 
-def test_per_sample_baselines_are_complete():
+def test_baseline_distribution_is_shared_by_all_samples():
     model = LinearRegression().fit(np.eye(2), np.array([1.0, 2.0]))
     data = np.array([[1.0, 2.0], [3.0, -1.0]])
-    baselines = np.array([[0.0, 0.0], [1.0, 1.0]])
+    baselines = np.array([[0.0, 0.0], [1.0, 1.0], [-1.0, 0.5]])
 
     result = uig.Explainer(model, baselines)(data)
 
-    np.testing.assert_allclose(result.base_values, model.predict(baselines))
+    expected_base_value = model.predict(baselines).mean()
+    np.testing.assert_allclose(result.base_values, expected_base_value)
     np.testing.assert_allclose(
         result.values.sum(axis=1) + result.base_values, model.predict(data)
     )

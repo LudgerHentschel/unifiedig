@@ -12,8 +12,10 @@ with raw scalar-output semantics and structured single-tensor inputs.
 
 ## 0.1.0.dev3 — trees
 
-Integrated Gradients for supported sklearn tree ensembles, with exact path
-handling where practical.
+Optional integration with TreeIG for exact path attributions on its supported
+sklearn, XGBoost, and LightGBM models. TreeIG owns model support, target-output
+semantics, and attribution computation; Unified IG owns baseline normalization
+and the common `Explanation` result.
 
 ## 0.1.0 — stable V1
 
