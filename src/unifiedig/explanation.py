@@ -26,8 +26,11 @@ class Explanation:
         values = np.asarray(self.values)
         data = np.asarray(self.data)
         base_values = np.asarray(self.base_values)
-        if data.ndim < 2:
-            raise ValueError("data must have a leading sample dimension")
+        object.__setattr__(self, "values", values)
+        object.__setattr__(self, "data", data)
+        object.__setattr__(self, "base_values", base_values)
+        if data.ndim < 2 or data.shape[0] == 0:
+            raise ValueError("data must have a non-empty leading sample dimension")
         scalar_output = values.shape == data.shape
         multi_output = values.ndim == data.ndim + 1 and values.shape[:-1] == data.shape
         if not scalar_output and not multi_output:
@@ -43,6 +46,7 @@ class Explanation:
             raise ValueError(f"base_values must have shape {expected_base_shape}")
         if self.completeness_error is not None:
             completeness_error = np.asarray(self.completeness_error)
+            object.__setattr__(self, "completeness_error", completeness_error)
             if completeness_error.shape != base_values.shape:
                 raise ValueError(
                     "completeness_error must have the same shape as base_values"

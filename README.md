@@ -1,8 +1,7 @@
 # Unified IG
 
 Unified IG provides one small, SHAP-like API for Integrated Gradients across
-model families. The first implementation supports closed-form attributions for
-scikit-learn linear models and multilayer perceptrons.
+linear models, neural networks, and tree ensembles.
 
 ```python
 import unifiedig as uig
@@ -22,6 +21,18 @@ optional dependency; call `explanation.to_shap()` to use its plotting tools.
 
 ## Installation
 
+Install the core sklearn support from PyPI:
+
+```console
+pip install unifiedig
+```
+
+Install every optional backend and the SHAP adapter with:
+
+```console
+pip install "unifiedig[all]"
+```
+
 During development, install the project and its test dependencies with:
 
 ```console
@@ -34,6 +45,16 @@ For regression, attributions sum to the difference between the prediction and
 the baseline prediction. Binary classifiers are explained on their
 decision-score (logit) scale; probability attributions are not part of V1.
 See `docs/semantics.md` for the complete array-shape and output contract.
+
+A baseline matrix is an equally weighted distribution shared by every input:
+
+```python
+background = X_train[:100]
+explanation = uig.Explainer(model, background)(X_test)
+```
+
+Unified IG averages the attribution paths and model output over all background
+rows. It does not pair background row `i` with input row `i`.
 
 Numerical explanations expose their observed completeness residual:
 
@@ -87,3 +108,9 @@ python -m twine check dist/*
 ```
 
 See `CONTRIBUTING.md` for the development workflow.
+
+## V1 public API
+
+The stable V1 surface is deliberately small: `Explainer`, `Explanation`, and
+`Explanation.to_shap()`. Unified IG has no plotting API and SHAP is not a core
+dependency.

@@ -26,7 +26,12 @@ _BACKENDS: Sequence[Type[Backend]] = (
 
 
 class Explainer:
-    """Select an IG backend and expose a consistent callable interface.
+    """Explain a model with Integrated Gradients through one stable interface.
+
+    ``baseline`` is either one reference sample or an equally weighted shared
+    baseline distribution. Every input is attributed against every baseline;
+    matching input and baseline row counts do not imply pairing. ``n_steps``
+    controls numerical backends and is ignored by exact backends.
 
     Binary classifiers are explained on their decision-score (logit) scale in
     V1. Probability attributions are intentionally not offered.

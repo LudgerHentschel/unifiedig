@@ -16,8 +16,43 @@ class TreeIGBackend:
         try:
             import treeig
         except ImportError:
-            return False
+            return cls._looks_like_supported_model(model)
         return bool(treeig.supports(model))
+
+    @staticmethod
+    def _looks_like_supported_model(model: object) -> bool:
+        """Recognize likely TreeIG models when the optional package is absent."""
+        try:
+            from sklearn.ensemble import (
+                ExtraTreesRegressor,
+                GradientBoostingClassifier,
+                GradientBoostingRegressor,
+                RandomForestRegressor,
+            )
+            from sklearn.tree import DecisionTreeRegressor
+        except ImportError:  # pragma: no cover - sklearn is a core dependency
+            sklearn_types = ()
+        else:
+            sklearn_types = (
+                DecisionTreeRegressor,
+                ExtraTreesRegressor,
+                GradientBoostingClassifier,
+                GradientBoostingRegressor,
+                RandomForestRegressor,
+            )
+        if isinstance(model, sklearn_types):
+            return True
+
+        model_type = type(model)
+        optional_types = {
+            ("xgboost.core", "Booster"),
+            ("xgboost.sklearn", "XGBClassifier"),
+            ("xgboost.sklearn", "XGBRegressor"),
+            ("lightgbm.basic", "Booster"),
+            ("lightgbm.sklearn", "LGBMClassifier"),
+            ("lightgbm.sklearn", "LGBMRegressor"),
+        }
+        return (model_type.__module__, model_type.__name__) in optional_types
 
     def __init__(self, model: object, *, n_steps: int = 64) -> None:
         try:

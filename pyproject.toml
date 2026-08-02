@@ -4,16 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "unifiedig"
-version = "0.1.0.dev3"
+version = "0.1.0"
 description = "A unified, model-agnostic interface for Integrated Gradients"
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 authors = [{name = "Ludger Hentschel"}]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = ["numpy>=1.23", "scikit-learn>=1.2"]
 
@@ -21,6 +26,7 @@ dependencies = ["numpy>=1.23", "scikit-learn>=1.2"]
 shap = ["shap>=0.42"]
 torch = ["captum>=0.7", "torch>=2.0"]
 trees = ["treeig>=0.1.8"]
+all = ["captum>=0.7", "shap>=0.42", "torch>=2.0", "treeig>=0.1.8"]
 test = [
     "build>=1",
     "matplotlib>=3.6",
@@ -31,8 +37,16 @@ test = [
     "twine>=5",
 ]
 
+[project.urls]
+Homepage = "https://github.com/LudgerHentschel/unifiedig"
+Repository = "https://github.com/LudgerHentschel/unifiedig"
+Issues = "https://github.com/LudgerHentschel/unifiedig/issues"
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+unifiedig = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

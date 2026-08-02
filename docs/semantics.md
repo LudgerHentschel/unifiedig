@@ -17,7 +17,8 @@ individual backends—validates the baseline distribution.
 
 Every input is attributed from the same baseline distribution. Unified IG
 averages its Integrated Gradients paths over the distribution; it never infers
-row pairing from equal input and baseline counts.
+row pairing from equal input and baseline counts. Baseline rows receive equal
+weight in V1.
 
 ## Explanation arrays
 

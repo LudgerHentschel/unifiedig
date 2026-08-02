@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0
+
+- Stabilize the `Explainer` and `Explanation` V1 API.
+- Define baseline matrices as equally weighted distributions shared by every input.
+- Provide exact TreeIG, closed-form linear, analytic sklearn MLP, and optional
+  PyTorch/Captum backends behind one dispatch interface.
+- Improve optional-dependency errors, package metadata, and installed type information.
+
 ## 0.1.0.dev3
 
 - Add an optional exact tree-model backend powered entirely by TreeIG.

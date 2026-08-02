@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 from sklearn.dummy import DummyRegressor
 from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
 
 import unifiedig as uig
 
@@ -20,6 +21,28 @@ def test_bad_baseline_shape_is_rejected():
     model = LinearRegression().fit(np.eye(2), np.array([1.0, 2.0]))
     with pytest.raises(ValueError, match="baseline"):
         uig.Explainer(model, [0.0, 0.0, 0.0])(np.eye(2))
+
+
+def test_empty_data_batch_is_rejected():
+    model = LinearRegression().fit(np.eye(2), np.array([1.0, 2.0]))
+    with pytest.raises(ValueError, match="non-empty"):
+        uig.Explainer(model, [0.0, 0.0])(np.empty((0, 2)))
+
+
+def test_missing_tree_extra_has_actionable_error(monkeypatch):
+    model = DecisionTreeRegressor(random_state=0).fit(
+        np.eye(2), np.array([1.0, 2.0])
+    )
+    real_import = builtins.__import__
+
+    def without_treeig(name, *args, **kwargs):
+        if name == "treeig":
+            raise ImportError
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", without_treeig)
+    with pytest.raises(ImportError, match=r"unifiedig\[trees\]"):
+        uig.Explainer(model, [0.0, 0.0])
 
 
 def test_to_shap_has_actionable_optional_dependency_error(monkeypatch):
@@ -87,12 +110,33 @@ def test_unfitted_supported_model_is_rejected():
 
 
 def test_explanation_rejects_inconsistent_parallel_array_shapes():
+    with pytest.raises(ValueError, match="non-empty"):
+        uig.Explanation(
+            values=np.empty((0, 2)),
+            base_values=np.empty(0),
+            data=np.empty((0, 2)),
+        )
+
     with pytest.raises(ValueError, match="values must match data"):
         uig.Explanation(
             values=np.zeros((2, 3)),
             base_values=np.zeros(2),
             data=np.zeros((2, 2)),
         )
+
+
+def test_explanation_normalizes_array_like_fields():
+    explanation = uig.Explanation(
+        values=[[1.0, -1.0]],
+        base_values=[2.0],
+        data=[[3.0, 4.0]],
+        completeness_error=[0.0],
+    )
+
+    assert isinstance(explanation.values, np.ndarray)
+    assert isinstance(explanation.base_values, np.ndarray)
+    assert isinstance(explanation.data, np.ndarray)
+    assert isinstance(explanation.completeness_error, np.ndarray)
 
     with pytest.raises(ValueError, match="base_values must have shape"):
         uig.Explanation(

@@ -12,7 +12,7 @@ def normalize_data(data: Any) -> NDArray[np.floating]:
     array = np.asarray(data, dtype=float)
     if array.ndim == 1:
         array = array.reshape(1, -1)
-    if array.ndim != 2 or array.shape[1] == 0:
+    if array.ndim != 2 or array.shape[0] == 0 or array.shape[1] == 0:
         raise ValueError("data must be a non-empty 1-D sample or 2-D sample matrix")
     if not np.isfinite(array).all():
         raise ValueError("data must contain only finite values")
