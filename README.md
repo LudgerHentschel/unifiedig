@@ -35,6 +35,17 @@ the baseline prediction. Binary classifiers are explained on their
 decision-score (logit) scale; probability attributions are not part of V1.
 See `docs/semantics.md` for the complete array-shape and output contract.
 
+Numerical explanations expose their observed completeness residual:
+
+```python
+explanation.completeness_error
+explanation.max_abs_completeness_error
+```
+
+Unified IG warns when this error exceeds the configured tolerance. Increasing
+`n_steps` usually improves it. See the `examples/` directory for complete
+linear, logistic, MLP regression, and MLP classification programs.
+
 ## Supported models
 
 - `sklearn.linear_model.LinearRegression` (closed form)

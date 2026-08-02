@@ -1,8 +1,13 @@
 """Unified Integrated Gradients public API."""
 
+from importlib.metadata import PackageNotFoundError, version
+
 from .explainer import Explainer
 from .explanation import Explanation
 
 __all__ = ["Explainer", "Explanation"]
-__version__ = "0.1.0.dev0"
 
+try:
+    __version__ = version("unifiedig")
+except PackageNotFoundError:
+    __version__ = "0+unknown"

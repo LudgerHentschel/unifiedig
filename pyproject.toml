@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "unifiedig"
-version = "0.1.0.dev0"
+version = "0.1.0.dev1"
 description = "A unified, model-agnostic interface for Integrated Gradients"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -19,7 +19,15 @@ dependencies = ["numpy>=1.23", "scikit-learn>=1.2"]
 
 [project.optional-dependencies]
 shap = ["shap>=0.42"]
-test = ["build>=1", "pandas>=1.5", "pytest>=7", "shap>=0.42", "twine>=5"]
+test = [
+    "build>=1",
+    "matplotlib>=3.6",
+    "pandas>=1.5",
+    "pytest>=7",
+    "shap>=0.42",
+    "tomli>=2; python_version < '3.11'",
+    "twine>=5",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

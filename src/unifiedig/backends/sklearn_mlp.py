@@ -53,12 +53,15 @@ class SklearnMLPBackend:
 
         assert integrated_gradient is not None
         base_values = self._explained_output(baseline)
+        output_values = self._explained_output(data)
         if integrated_gradient.shape[-1] == 1:
             values = difference * integrated_gradient[..., 0]
-            return values, base_values[:, 0], self._output_names()
+            return BackendResult(
+                values, base_values[:, 0], output_values[:, 0], self._output_names()
+            )
 
         values = difference[:, :, None] * integrated_gradient
-        return values, base_values, self._output_names()
+        return BackendResult(values, base_values, output_values, self._output_names())
 
     def _forward_hidden(self, data: FloatArray) -> Tuple[FloatArray, List[FloatArray]]:
         activation = data
@@ -123,4 +126,3 @@ class SklearnMLPBackend:
             return [str(self.model.classes_[1])]
         n_outputs = int(self.model.n_outputs_)
         return [str(index) for index in range(n_outputs)] if n_outputs > 1 else None
-

@@ -20,18 +20,43 @@ class Explanation:
     data: NDArray[Any]
     feature_names: Optional[Sequence[str]] = None
     output_names: Optional[Sequence[str]] = None
+    completeness_error: Optional[NDArray[np.floating]] = None
 
     def __post_init__(self) -> None:
         values = np.asarray(self.values)
         data = np.asarray(self.data)
         base_values = np.asarray(self.base_values)
-        if values.shape[0] != data.shape[0]:
-            raise ValueError("values and data must contain the same number of samples")
-        if base_values.ndim == 0 or base_values.shape[0] != data.shape[0]:
-            raise ValueError("base_values must contain one entry per sample")
+        if data.ndim != 2:
+            raise ValueError("data must have shape (samples, features)")
+        if values.ndim not in (2, 3) or values.shape[:2] != data.shape:
+            raise ValueError(
+                "values must have shape (samples, features) or "
+                "(samples, features, outputs)"
+            )
+        expected_base_shape = (
+            (data.shape[0],)
+            if values.ndim == 2
+            else (data.shape[0], values.shape[2])
+        )
+        if base_values.shape != expected_base_shape:
+            raise ValueError(f"base_values must have shape {expected_base_shape}")
+        if self.completeness_error is not None:
+            completeness_error = np.asarray(self.completeness_error)
+            if completeness_error.shape != base_values.shape:
+                raise ValueError(
+                    "completeness_error must have the same shape as base_values"
+                )
 
     def __len__(self) -> int:
         return len(self.data)
+
+    @property
+    def max_abs_completeness_error(self) -> Optional[float]:
+        """Largest absolute completeness residual, or ``None`` if unavailable."""
+
+        if self.completeness_error is None:
+            return None
+        return float(np.max(np.abs(self.completeness_error)))
 
     def to_shap(self) -> Any:
         """Return an equivalent ``shap.Explanation`` when SHAP is installed."""
@@ -49,4 +74,3 @@ class Explanation:
             feature_names=self.feature_names,
             output_names=self.output_names,
         )
-

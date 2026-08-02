@@ -54,6 +54,26 @@ def test_to_shap_returns_compatible_explanation():
     assert converted.feature_names == ["a", "b"]
 
 
+def test_shap_waterfall_and_beeswarm_accept_unifiedig_explanation():
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    shap = pytest.importorskip("shap")
+    model = LinearRegression().fit(
+        np.array([[0.0, 0.0], [1.0, 1.0], [2.0, -1.0]]),
+        np.array([0.0, 2.0, 1.0]),
+    )
+    result = uig.Explainer(model, [0.0, 0.0])(
+        np.array([[1.0, 0.5], [0.5, -0.5]])
+    ).to_shap()
+
+    shap.plots.waterfall(result[0], show=False)
+    shap.plots.beeswarm(result, show=False)
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
 def test_dataframe_columns_become_feature_names():
     training = pd.DataFrame([[0.0, 0.0], [1.0, 1.0]], columns=["age", "income"])
     model = LinearRegression().fit(training, np.array([0.0, 1.0]))
@@ -64,3 +84,19 @@ def test_dataframe_columns_become_feature_names():
 def test_unfitted_supported_model_is_rejected():
     with pytest.raises(ValueError, match="fitted"):
         uig.Explainer(LinearRegression(), [0.0])
+
+
+def test_explanation_rejects_inconsistent_parallel_array_shapes():
+    with pytest.raises(ValueError, match="values must have shape"):
+        uig.Explanation(
+            values=np.zeros((2, 3)),
+            base_values=np.zeros(2),
+            data=np.zeros((2, 2)),
+        )
+
+    with pytest.raises(ValueError, match="base_values must have shape"):
+        uig.Explanation(
+            values=np.zeros((2, 2, 3)),
+            base_values=np.zeros(2),
+            data=np.zeros((2, 2)),
+        )

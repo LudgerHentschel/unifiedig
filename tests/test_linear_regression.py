@@ -17,6 +17,7 @@ def test_linear_regression_is_complete_for_shared_baseline():
     np.testing.assert_allclose(result.values.sum(axis=1), model.predict(data) - result.base_values)
     np.testing.assert_allclose(result.base_values, model.predict(baseline.reshape(1, -1)).repeat(2))
     assert result.data.shape == result.values.shape == (2, 2)
+    assert result.max_abs_completeness_error < 1e-12
 
 
 def test_scalar_baseline_and_single_sample_are_normalized():

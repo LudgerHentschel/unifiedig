@@ -35,15 +35,20 @@ class SklearnLinearBackend:
             weights = coefficients.reshape(-1)
             values = (data - baseline) * weights
             base_values = baseline @ weights + intercept.reshape(-1)[0]
-            return values, base_values, [str(self.model.classes_[1])]
+            output_values = data @ weights + intercept.reshape(-1)[0]
+            return BackendResult(
+                values, base_values, output_values, [str(self.model.classes_[1])]
+            )
 
         if coefficients.ndim == 1:
             values = (data - baseline) * coefficients
             base_values = baseline @ coefficients + intercept.reshape(-1)[0]
-            return values, base_values, None
+            output_values = data @ coefficients + intercept.reshape(-1)[0]
+            return BackendResult(values, base_values, output_values, None)
 
         # Multi-output regression: (samples, features, outputs).
         values = (data - baseline)[:, :, None] * coefficients.T[None, :, :]
         base_values = baseline @ coefficients.T + intercept
+        output_values = data @ coefficients.T + intercept
         output_names: Optional[Sequence[str]] = [str(i) for i in range(coefficients.shape[0])]
-        return values, base_values, output_names
+        return BackendResult(values, base_values, output_values, output_names)

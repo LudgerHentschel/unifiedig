@@ -54,10 +54,16 @@ Closed-form backends satisfy this up to floating-point arithmetic. Numerical
 backends approximate the path integral and document their integration method;
 their completeness tests use an explicit numerical tolerance.
 
+`Explanation.completeness_error` stores the signed residual between the model
+output and the reconstructed output. `max_abs_completeness_error` summarizes
+the worst sample/output. Numerical backends emit a `RuntimeWarning` when this
+exceeds the configured absolute and relative tolerances. The check can be
+configured with `completeness_atol`, `completeness_rtol`, and
+`check_completeness` on `Explainer`.
+
 ## Numerical integration
 
 Numerical backends use Gauss–Legendre quadrature on the unit path interval.
 `Explainer(..., n_steps=N)` controls the number of quadrature nodes. More nodes
 usually improve accuracy but require proportionally more gradient evaluations.
 The default is 64.
-

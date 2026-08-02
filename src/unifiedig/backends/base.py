@@ -1,14 +1,18 @@
 """Contract implemented by model-family-specific attribution backends."""
 
-from typing import Optional, Protocol, Sequence, Tuple
+from typing import NamedTuple, Optional, Protocol, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
 
 
-BackendResult = Tuple[
-    NDArray[np.floating], NDArray[np.floating], Optional[Sequence[str]]
-]
+class BackendResult(NamedTuple):
+    """Internal backend result, including the output needed for diagnostics."""
+
+    values: NDArray[np.floating]
+    base_values: NDArray[np.floating]
+    output_values: NDArray[np.floating]
+    output_names: Optional[Sequence[str]]
 
 
 class Backend(Protocol):
