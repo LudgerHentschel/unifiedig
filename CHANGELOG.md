@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1.dev0
+
+- Delegate analytic scikit-learn MLP values and input Jacobians to skgrad.
+
 ## 0.1.0
 
 - Stabilize the `Explainer` and `Explanation` V1 API.
