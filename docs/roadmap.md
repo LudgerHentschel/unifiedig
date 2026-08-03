@@ -1,36 +1,46 @@
 # Roadmap
 
-## 0.1.0.dev1 — correctness and release safety
+## Current development line — 0.1.1.dev0
 
-Completeness diagnostics, broader MLP validation, SHAP plot compatibility,
-examples, benchmarks, and guarded releases.
+- Delegate smooth sklearn model support and analytic input Jacobians to skgrad.
+- Recognize affine regression and binary score-classification models through
+  skgrad's unified support API.
+- Preserve a constant-Jacobian fast path for exact affine attribution.
+- Provide an opt-in, batched finite-difference fallback for other smooth
+  sklearn estimators.
+- Document the complete model inventory, output semantics, baseline behavior,
+  numerical diagnostics, and SHAP plotting adapter.
 
-## 0.1.0.dev2 — PyTorch
+## Next model backend — JAX
 
-Optional PyTorch and Captum integration behind the existing `Explainer` API,
-with raw scalar-output semantics and structured single-tensor inputs.
+Add optional JAX support for differentiable batched prediction functions with:
 
-## 0.1.0.dev3 — trees
+- parameters supplied explicitly or captured in a closure;
+- one raw scalar output per sample;
+- native JAX automatic gradients;
+- Gauss–Legendre path integration;
+- shared baseline distributions;
+- dtype and 64-bit-mode diagnostics; and
+- completeness, cross-framework, packaging, and optional-dependency tests.
 
-Optional integration with TreeIG for exact path attributions on its supported
-sklearn, XGBoost, and LightGBM models. TreeIG owns model support, target-output
-semantics, and attribution computation; Unified IG owns baseline normalization
-and the common `Explanation` result.
+JAX libraries such as Flax, Equinox, NNX, and Haiku should be supported through
+thin prediction-function adapters rather than separate public explainer
+classes.
 
-## 0.1.0 — stable V1
+## Before the next published release
 
-Stabilize the public API and documented output semantics.
+- Stabilize the JAX constructor and optional dependency extra.
+- Add a JAX example and dedicated GitHub Actions job.
+- Run source-tree and installed-wheel tests for all optional backends.
+- Review the README, changelog, error messages, and dependency matrix against
+  the packaged artifacts.
 
-## Future work
+## Deferred work
 
-Refactor smooth-model integration around a small gradient-provider protocol.
-skgrad should remain the provider for analytic sklearn gradients; PyTorch and
-JAX adapters should obtain gradients from their native autodiff systems while
-isolating framework-specific array, device, dtype, and execution-state details
-from the Unified IG core. New providers should be registerable without adding
-model-type lists to `Explainer`.
-
-Investigate exact piecewise-linear IG for ReLU networks by detecting activation
-region transitions along the baseline path. This is analogous to partitioning a
-tree path at decision-boundary crossings and may improve both accuracy and
-speed when fixed quadrature needs many nodes.
+- Multiclass output targeting.
+- TensorFlow support.
+- Exact piecewise-linear IG for ReLU networks by detecting activation-region
+  transitions along the baseline path.
+- Further batching and memory optimization for large smooth models.
+- A public third-party backend registry, if model coverage eventually makes
+  one useful.

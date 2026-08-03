@@ -9,6 +9,8 @@
 - Add an opt-in, batched finite-difference fallback for other smooth sklearn
   regressors and binary decision-score classifiers.
 - Reject known discontinuous estimator families from the numerical fallback.
+- Expand the README with computation routes, model coverage, baseline guidance,
+  SHAP plotting, numerical diagnostics, and the planned JAX scope.
 
 ## 0.1.0
 

@@ -1,158 +1,398 @@
 # Unified IG
 
-Unified IG provides one small, SHAP-like API for Integrated Gradients across
-linear models, neural networks, and tree ensembles.
+[![Tests](https://github.com/LudgerHentschel/unifiedig/actions/workflows/tests.yml/badge.svg)](https://github.com/LudgerHentschel/unifiedig/actions/workflows/tests.yml)
+[![PyPI version](https://img.shields.io/pypi/v/unifiedig.svg)](https://pypi.org/project/unifiedig/)
+[![Python versions](https://img.shields.io/pypi/pyversions/unifiedig.svg)](https://pypi.org/project/unifiedig/)
+[![License](https://img.shields.io/pypi/l/unifiedig.svg)](LICENSE)
+
+**Integrated Gradients prediction attribution for a broad range of Python
+machine-learning models, through one interface.**
+
+Give Unified IG a fitted model and a reference background. Unified IG selects
+the appropriate implementation and returns one consistent explanation object.
 
 ```python
 import unifiedig as uig
 
-explainer = uig.Explainer(model, baseline)
+explainer = uig.Explainer(model, background)
 explanation = explainer(X)
 ```
 
-For numerical backends, the quadrature resolution is configurable:
+That is the standard user experience. There are no model-specific explainer
+classes to choose and no gradient backend to configure.
+
+The result contains feature attributions, baseline values, input data, labels,
+and a completeness diagnostic:
 
 ```python
-explainer = uig.Explainer(model, baseline, n_steps=128)
+explanation.values
+explanation.base_values
+explanation.data
+explanation.feature_names
+explanation.output_names
+explanation.max_abs_completeness_error
 ```
 
-`Explanation` is lightweight and has SHAP-compatible fields. SHAP remains an
-optional dependency; call `explanation.to_shap()` to use its plotting tools.
+If you want plots, convert the result and use SHAP's graphing routines:
+
+```python
+import shap
+
+shap_values = explanation.to_shap()
+shap.plots.beeswarm(shap_values)
+shap.plots.waterfall(shap_values[0])
+shap.plots.bar(shap_values)
+```
+
+Unified IG deliberately has no plotting subsystem of its own.
+
+## Broad model coverage
+
+The same public API currently covers:
+
+- linear and regularized linear sklearn models;
+- binary linear classifiers on their decision-score scale;
+- sklearn multilayer perceptrons;
+- supported sklearn decision trees and ensembles;
+- XGBoost and LightGBM models supported by TreeIG;
+- scalar-output PyTorch modules; and
+- other smooth sklearn regressors and binary decision-score classifiers through
+  an explicit numerical fallback.
+
+JAX support is the next planned model backend. See
+[Planned JAX support](#planned-jax-support).
+
+## Quick start
+
+```python
+import numpy as np
+from sklearn.linear_model import Ridge
+
+import unifiedig as uig
+
+rng = np.random.default_rng(0)
+X_train = rng.normal(size=(200, 4))
+y_train = 2.0 * X_train[:, 0] - X_train[:, 1] + 0.5 * X_train[:, 2]
+model = Ridge(alpha=0.5).fit(X_train, y_train)
+
+background = X_train[:50]
+X_eval = X_train[100:105]
+
+explanation = uig.Explainer(model, background)(X_eval)
+
+np.testing.assert_allclose(
+    explanation.base_values + explanation.values.sum(axis=1),
+    model.predict(X_eval),
+)
+```
+
+For a pandas `DataFrame`, Unified IG carries column labels into
+`explanation.feature_names`.
 
 ## Installation
 
-Install the core sklearn support from PyPI:
+The core installation includes NumPy, scikit-learn, skgrad, and the numerical
+fallback:
 
 ```console
 pip install unifiedig
 ```
 
-Install every optional backend and the SHAP adapter with:
+Optional capabilities are installed separately:
 
-```console
-pip install "unifiedig[all]"
+| Capability | Installation |
+|---|---|
+| Exact sklearn, XGBoost, and LightGBM tree attribution | `pip install "unifiedig[trees]"` |
+| PyTorch attribution through Captum | `pip install "unifiedig[torch]"` |
+| Conversion to `shap.Explanation` | `pip install "unifiedig[shap]"` |
+| All currently released optional capabilities | `pip install "unifiedig[all]"` |
+
+XGBoost and LightGBM models also require their respective model packages. JAX
+is planned but is not included in the current release.
+
+## One attribution mechanism
+
+Unified IG computes the same quantity for every model family: Integrated
+Gradients along the straight-line path from a baseline input `x0` to an
+evaluation input `x`.
+
+For feature `j`,
+
+```text
+IG_j(x; x0) = (x_j - x0_j)
+               * integral from 0 to 1 of
+                 d f(x0 + t(x - x0)) / d x_j dt
 ```
 
-During development, install the project and its test dependencies with:
+The attribution mechanism does not change across models. What changes is how
+Unified IG obtains the path information efficiently and accurately.
+
+## Specialized computation for speed and accuracy
+
+Unified IG automatically selects the strongest available route:
+
+| Route | Gradient or path calculation | Integration | Typical models |
+|---|---|---|---|
+| Exact affine | Constant analytic Jacobian from skgrad | Closed form | Linear and regularized linear models |
+| Exact trees | TreeIG split-boundary traces | Exact | Supported sklearn, XGBoost, and LightGBM trees |
+| Differentiable sklearn | Analytic Jacobians from skgrad | Gauss–Legendre quadrature | sklearn MLPs |
+| PyTorch | Automatic gradients through Captum | Gauss–Legendre quadrature | Scalar-output `torch.nn.Module` models |
+| Numerical fallback | Batched central finite differences | Gauss–Legendre quadrature | Other smooth sklearn estimators |
+
+Specialized routes always take precedence over the fallback. Users get exact
+or high-quality gradients when the model makes them available, without having
+to identify the backend themselves.
+
+## Baselines and CBaseline
+
+The baseline defines the reference prediction from which the explanation
+starts. Unified IG accepts one baseline observation or an equally weighted
+baseline distribution:
+
+```python
+background = X_train[:100]
+explanation = uig.Explainer(model, background)(X_eval)
+```
+
+Every evaluation observation is compared with every background row. Equal
+input and background row counts never imply row-by-row pairing. Unified IG
+averages the paths and baseline outputs over the complete shared distribution.
+
+For a principled prediction-neutral reference distribution, use the
+equal-weight rows constructed by
+[CBaseline](https://pypi.org/project/cbaseline/):
+
+```python
+from cbaseline import background
+
+f_train = model.predict(X_train)
+bg = background(
+    predictions=f_train,
+    f0=float(f_train.mean()),
+    features=X_train,
+    weighting="equal",
+    size=100,
+)
+
+explanation = uig.Explainer(model, bg.rows)(X_eval)
+```
+
+This produces attributions relative to the requested reference prediction
+while keeping the background supported by observed data. Unified IG currently
+treats background matrices as equally weighted; weighted CBaseline backgrounds
+are not consumed directly.
+
+## Why Integrated Gradients rather than SHAP attribution?
+
+Integrated Gradients and SHAP answer different attribution questions.
+
+- **IG is path based.** It decomposes the change in model output along a path
+  from an explicit reference input or distribution to the observation.
+- **SHAP is coalition based.** It attributes output using Shapley-value
+  averaging over feature-presence coalitions defined by a background and
+  masking rule.
+- **IG can exploit gradients.** For differentiable models, one gradient pass
+  returns information for every feature. Analytic and automatic gradients can
+  therefore be substantially faster than feature-by-feature perturbation.
+- **Both are additive explanations.** Unified IG records the observed
+  completeness residual and can pass its result to SHAP for plotting.
+
+IG is attractive when the path from a meaningful reference is the scientific
+or practical comparison of interest, and when gradients or exact path methods
+are available. SHAP remains appropriate when Shapley coalition semantics are
+the desired object. Unified IG is not an approximation to SHAP.
+
+## Defaults and available controls
+
+The default choices are designed to make the common case short:
+
+| Choice | Default behavior |
+|---|---|
+| Backend | Automatically selected from the model |
+| Regression output | Model prediction |
+| Binary classification output | Positive-class decision score, logit, or raw margin |
+| Probability attribution | Not offered |
+| Baseline matrix | Shared, equally weighted distribution |
+| Path | Straight line from each baseline to each input |
+| Numerical integration | 64-point Gauss–Legendre quadrature |
+| Completeness checking | Enabled |
+| Black-box numerical fallback | Disabled unless explicitly requested |
+
+Numerical resolution and diagnostics can be adjusted when necessary:
+
+```python
+explainer = uig.Explainer(
+    model,
+    background,
+    n_steps=128,
+    completeness_atol=1e-6,
+    completeness_rtol=1e-4,
+    check_completeness=True,
+)
+```
+
+Exact affine and tree routes ignore `n_steps`.
+
+## Detailed current coverage
+
+### Exact attribution
+
+| Ecosystem | Supported models | Explained output |
+|---|---|---|
+| sklearn affine regression | `LinearRegression`, `Ridge`, `Lasso`, `ElasticNet` | Prediction |
+| sklearn affine classification | Binary `LogisticRegression`, `RidgeClassifier` | Decision score |
+| sklearn trees | `DecisionTreeRegressor`, `RandomForestRegressor`, `ExtraTreesRegressor`, `GradientBoostingRegressor` | Prediction |
+| sklearn boosted classification | Binary `GradientBoostingClassifier` | Decision score |
+| XGBoost | `XGBRegressor`, binary `XGBClassifier`, compatible native `Booster` models | Prediction or raw margin |
+| LightGBM | `LGBMRegressor`, binary `LGBMClassifier`, compatible native `Booster` models | Prediction or raw score |
+
+Tree support is delegated to TreeIG. TreeIG's requirements and exclusions—such
+as finite numeric inputs and numeric splits—also apply through Unified IG.
+
+### Fast gradients with numerical integration
+
+| Ecosystem | Supported models | Explained output |
+|---|---|---|
+| sklearn neural networks | Identity-output `MLPRegressor` | Prediction |
+| sklearn neural networks | Binary `MLPClassifier` | Pre-probability logit |
+| PyTorch | `torch.nn.Module` with one raw scalar output per sample | Model output |
+
+sklearn MLP hidden activations may be identity, logistic, tanh, or ReLU.
+Multi-output MLP regression is supported. PyTorch inputs may have any
+single-tensor sample shape; Unified IG preserves the module's device,
+floating-point dtype, and prior training/evaluation state.
+
+### Opt-in numerical fallback
+
+Otherwise unsupported smooth sklearn estimators can use batched central finite
+differences:
+
+```python
+explainer = uig.Explainer(
+    model,
+    background,
+    fallback="finite_difference",
+    n_steps=32,
+)
+```
+
+The fallback accepts fitted regressors with `predict` and binary classifiers
+with `decision_function`. It does not infer probability outputs. Work grows
+with the number of inputs, baselines, quadrature nodes, and features, so this
+route may be substantially slower than analytic or automatic gradients.
+
+Advanced numerical controls are available:
+
+```python
+explainer = uig.Explainer(
+    model,
+    background,
+    fallback="finite_difference",
+    finite_difference_step=1e-5,
+    finite_difference_batch_size=8192,
+)
+```
+
+Finite differences are not a valid substitute for TreeIG on piecewise-constant
+models. Local gradients generally miss discontinuous boundary crossings, so
+known tree and nearest-neighbor families are rejected rather than assigned
+misleading attributions.
+
+## Explanation semantics
+
+For every scalar-output explanation, Unified IG targets
+
+```text
+explanation.base_values + explanation.values.sum(over features)
+    = explained model output
+```
+
+For regression, the explained output is the prediction. For binary
+classification, it is the positive-class decision score, logit, or raw margin.
+
+| Field | Meaning |
+|---|---|
+| `values` | Feature attributions; shaped like `data`, with a trailing output axis for multi-output models |
+| `base_values` | Mean explained output over the baseline distribution, repeated for each input |
+| `data` | Normalized evaluation data |
+| `feature_names` | DataFrame column names when available |
+| `output_names` | Output labels when available |
+| `completeness_error` | Signed output-reconstruction residual |
+| `max_abs_completeness_error` | Largest absolute residual |
+
+See [docs/semantics.md](docs/semantics.md) for the complete shape contract.
+
+## Completeness and numerical accuracy
+
+Exact backends generally reach floating-point precision. Quadrature and finite
+differences are approximate. Unified IG emits a `RuntimeWarning` when the
+completeness residual exceeds the configured tolerance.
+
+Increasing `n_steps` usually reduces quadrature error. For the numerical
+fallback, `finite_difference_step` may also matter. A small completeness
+residual is an important diagnostic, but it does not prove that an arbitrary
+model is smooth or that every individual attribution is accurate.
+
+## Planned JAX support
+
+JAX support is the next planned backend and is **not yet part of the installed
+package**.
+
+The intended first implementation provides:
+
+- a differentiable, batched JAX prediction function;
+- parameters supplied explicitly or captured in a closure;
+- one raw scalar output per sample;
+- native JAX automatic gradients;
+- Gauss–Legendre path integration;
+- shared baseline distributions and completeness diagnostics; and
+- clear JAX dtype and 64-bit-mode behavior.
+
+Flax, Equinox, NNX, Haiku, and hand-written JAX models should work through thin
+prediction-function adapters rather than separate public explainer classes.
+The final constructor spelling will be fixed with the implementation; explicit
+framework selection is preferable to guessing whether an arbitrary Python
+callable is JAX-compatible.
+
+The planned optional installation will be `pip install "unifiedig[jax]"` once
+that extra exists.
+
+## Current gaps and deferred scope
+
+Notable remaining ecosystem gaps include JAX, TensorFlow/Keras, CatBoost, and
+sklearn classifiers whose natural outputs are probabilities or vote shares
+rather than additive decision scores. These
+need explicit output semantics or specialized path support rather than a silent
+finite-difference approximation.
+
+Also deferred:
+
+- multiclass output targeting;
+- exact piecewise-linear integration at ReLU activation boundaries;
+- weighted baseline distributions;
+- multiple-input PyTorch models; and
+- a public third-party backend registry.
+
+## Examples
+
+Complete examples are available for:
+
+- [linear regression](examples/linear_regression.py)
+- [binary logistic regression](examples/logistic_regression.py)
+- [sklearn MLP regression](examples/mlp_regression.py)
+- [sklearn MLP classification](examples/mlp_classification.py)
+- [PyTorch](examples/pytorch.py)
+- [the numerical fallback](examples/numerical_fallback.py)
+
+## Development
+
+Install the project with its test dependencies:
 
 ```console
 python -m pip install -e ".[test]"
 ```
 
-## Output semantics
-
-For regression, attributions sum to the difference between the prediction and
-the baseline prediction. Binary classifiers are explained on their
-decision-score (logit) scale; probability attributions are not part of V1.
-See `docs/semantics.md` for the complete array-shape and output contract.
-
-A baseline matrix is an equally weighted distribution shared by every input:
-
-```python
-background = X_train[:100]
-explanation = uig.Explainer(model, background)(X_test)
-```
-
-Unified IG averages the attribution paths and model output over all background
-rows. It does not pair background row `i` with input row `i`.
-
-Numerical explanations expose their observed completeness residual:
-
-```python
-explanation.completeness_error
-explanation.max_abs_completeness_error
-```
-
-Unified IG warns when this error exceeds the configured tolerance. Increasing
-`n_steps` usually improves it. See the `examples/` directory for complete
-linear, logistic, MLP regression, and MLP classification programs.
-
-## Numerical fallback
-
-An otherwise unsupported smooth sklearn estimator can be explained with
-batched central finite differences:
-
-```python
-explainer = uig.Explainer(
-    model,
-    baseline,
-    fallback="finite_difference",
-)
-explanation = explainer(X)
-```
-
-Specialized backends always take precedence. The fallback supports fitted
-sklearn regressors with `predict` and binary classifiers with
-`decision_function`; it never substitutes probability outputs. It can be much
-slower because its work grows with the number of features, quadrature nodes,
-inputs, and baselines. `finite_difference_step` controls the relative central
-difference step, and `finite_difference_batch_size` bounds the number of
-perturbed rows evaluated together.
-
-Finite differences are inappropriate for piecewise-constant models because
-local gradients generally miss their discontinuities. Known tree and
-nearest-neighbor families are therefore rejected rather than given misleading
-attributions. Completeness diagnostics should be inspected carefully for every
-fallback result.
-
-## Supported models
-
-Unified IG currently recognizes the following fitted estimators:
-
-| Model family | Supported estimators | Explained output | Method |
-|---|---|---|---|
-| sklearn affine regression | `LinearRegression`, `Ridge`, `Lasso`, `ElasticNet` | Prediction | Exact closed form via skgrad |
-| sklearn affine classification | Binary `LogisticRegression`, `RidgeClassifier` | Decision score | Exact closed form via skgrad |
-| sklearn neural networks | Identity-output `MLPRegressor` | Prediction | Analytic skgrad Jacobians with Gauss–Legendre quadrature |
-| sklearn neural networks | Binary `MLPClassifier` | Pre-probability logit | Analytic skgrad Jacobians with Gauss–Legendre quadrature |
-| sklearn trees | `DecisionTreeRegressor`, `RandomForestRegressor`, `ExtraTreesRegressor`, `GradientBoostingRegressor` | Prediction | Exact via TreeIG |
-| sklearn boosted trees | Binary `GradientBoostingClassifier` | Decision score | Exact via TreeIG |
-| XGBoost | `XGBRegressor`, binary `XGBClassifier`, and compatible native `Booster` models | Prediction or raw margin | Exact via TreeIG |
-| LightGBM | `LGBMRegressor`, binary `LGBMClassifier`, and compatible native `Booster` models | Prediction or raw score | Exact via TreeIG |
-| PyTorch | `torch.nn.Module` with one raw scalar output per sample | Model output | Captum Gauss–Legendre IG |
-| Other smooth sklearn estimators | Regressors with `predict`; binary classifiers with `decision_function` | Prediction or decision score | Opt-in finite differences and Gauss–Legendre quadrature |
-
-Specialized smooth sklearn models are recognized through the single
-`skgrad.supports()` predicate, while tree models are recognized through
-`treeig.supports()`. This keeps estimator registries in their owning packages
-so additions can flow into Unified IG without duplicating model lists in its
-dispatch layer. skgrad's constant-Jacobian metadata preserves the exact affine
-fast path without exposing separate model-family support predicates.
-
-V1 intentionally rejects multiclass classifiers because `Explainer` does not
-yet expose an output target. Multi-output regressors are supported when their
-output follows the documented array contract. MLP hidden activations may be
-identity, logistic, tanh, or ReLU;
-`MLPRegressor` models with a non-identity output activation are rejected.
-TreeIG currently requires finite numeric inputs and numeric splits; its other
-documented exclusions also apply through Unified IG.
-
-Install PyTorch support separately so the core package remains lightweight:
-
-```console
-pip install "unifiedig[torch]"
-```
-
-Install exact tree-model support separately:
-
-```console
-pip install "unifiedig[trees]"
-```
-
-XGBoost and LightGBM models additionally require their respective packages.
-
-Tree attributions are computed by TreeIG; Unified IG normalizes the input and
-baseline and adapts TreeIG's exact result to `Explanation`.
-
-PyTorch models may accept tabular or structured single-tensor inputs. Unified IG
-preserves the model's device and floating-point dtype, temporarily evaluates the
-model in inference mode, and restores every module's prior training state. V1
-expects one raw scalar output per sample. For binary classification that output
-must be the logit, not a sigmoid probability.
-
-## Development
-
-Run the tests and validate distribution artifacts with:
+Run the tests and validate distribution artifacts:
 
 ```console
 pytest
@@ -160,10 +400,17 @@ python -m build
 python -m twine check dist/*
 ```
 
-See `CONTRIBUTING.md` for the development workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and
+[CHANGELOG.md](CHANGELOG.md) for release history.
 
-## V1 public API
+## Public API
 
-The stable V1 surface is deliberately small: `Explainer`, `Explanation`, and
-`Explanation.to_shap()`. Unified IG has no plotting API and SHAP is not a core
-dependency.
+The stable public surface remains deliberately small:
+
+```python
+uig.Explainer
+uig.Explanation
+uig.Explanation.to_shap
+```
+
+Model-family backends are private implementation details.
