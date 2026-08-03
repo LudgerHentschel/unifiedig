@@ -54,6 +54,27 @@ def test_torch_nonlinear_binary_logit_is_complete():
     assert result.output_names is None
 
 
+def test_torch_weighted_baseline_distribution():
+    model = torch.nn.Linear(2, 1, bias=True).double()
+    data = torch.tensor([[0.4, -0.2], [-0.5, 0.7]], dtype=torch.float64)
+    baselines = torch.tensor(
+        [[0.0, 0.0], [0.1, -0.1], [-0.2, 0.3]], dtype=torch.float64
+    )
+    weights = np.array([0.1, 0.2, 0.7])
+
+    result = uig.Explainer(
+        model, baselines, baseline_weights=weights
+    )(data)
+
+    expected_base = weights @ model(baselines).detach().numpy()[:, 0]
+    np.testing.assert_allclose(result.base_values, expected_base)
+    np.testing.assert_allclose(
+        result.values.sum(axis=1) + result.base_values,
+        model(data).detach().numpy()[:, 0],
+        atol=1e-8,
+    )
+
+
 def test_structured_tensor_input_and_scalar_baseline():
     class ImageSum(torch.nn.Module):
         def forward(self, inputs):

@@ -42,6 +42,34 @@ def test_gaussian_process_regression_fallback_is_complete():
     assert result.max_abs_completeness_error < 2e-5
 
 
+def test_gaussian_process_fallback_uses_baseline_weights():
+    X, y = _data(seed=76)
+    model = GaussianProcessRegressor(kernel=RBF(1.2), alpha=1e-6).fit(X, y)
+    baselines = X[:3]
+    weights = np.array([0.1, 0.2, 0.7])
+
+    with pytest.warns(RuntimeWarning, match="finite-difference gradients"):
+        explainer = uig.Explainer(
+            model,
+            baselines,
+            baseline_weights=weights,
+            n_steps=32,
+            fallback="finite_difference",
+            completeness_atol=2e-5,
+        )
+    result = explainer(X[10:14])
+
+    np.testing.assert_allclose(
+        result.base_values,
+        weights @ model.predict(baselines),
+    )
+    np.testing.assert_allclose(
+        result.values.sum(axis=1) + result.base_values,
+        model.predict(X[10:14]),
+        atol=2e-5,
+    )
+
+
 def test_binary_classifier_fallback_uses_decision_scores():
     X, score = _data(seed=71)
     y = (score > np.median(score)).astype(int)

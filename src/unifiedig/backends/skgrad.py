@@ -43,21 +43,29 @@ class SkgradBackend:
         self._nodes = (nodes + 1.0) / 2.0
         self._weights = weights / 2.0
 
-    def explain(self, data: FloatArray, baseline: FloatArray) -> BackendResult:
+    def explain(
+        self,
+        data: FloatArray,
+        baseline: FloatArray,
+        baseline_weights: FloatArray,
+    ) -> BackendResult:
         if data.shape[1] != self.model.n_features_in_:
             raise ValueError(f"data must have {self.model.n_features_in_} features")
 
         values: Optional[FloatArray] = None
-        for baseline_row in baseline:
+        for baseline_row, baseline_weight in zip(baseline, baseline_weights):
             difference = data - baseline_row
             integrated_jacobian = self._integrated_jacobian(data, baseline_row)
-            baseline_values = difference[:, :, None] * integrated_jacobian
+            baseline_values = (
+                baseline_weight * difference[:, :, None] * integrated_jacobian
+            )
             values = baseline_values if values is None else values + baseline_values
 
         assert values is not None
-        values /= baseline.shape[0]
         output_values = skgrad.model_output(self.model, data)
-        mean_base_value = skgrad.model_output(self.model, baseline).mean(axis=0)
+        mean_base_value = baseline_weights @ skgrad.model_output(
+            self.model, baseline
+        )
         base_values = np.broadcast_to(
             mean_base_value, (data.shape[0], mean_base_value.size)
         ).copy()

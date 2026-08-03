@@ -66,7 +66,12 @@ class FiniteDifferenceBackend:
         self._nodes = (nodes + 1.0) / 2.0
         self._weights = weights / 2.0
 
-    def explain(self, data: FloatArray, baseline: FloatArray) -> BackendResult:
+    def explain(
+        self,
+        data: FloatArray,
+        baseline: FloatArray,
+        baseline_weights: FloatArray,
+    ) -> BackendResult:
         n_samples, n_features = data.shape
         if n_features != self.model.n_features_in_:
             raise ValueError(f"data must have {self.model.n_features_in_} features")
@@ -76,7 +81,7 @@ class FiniteDifferenceBackend:
         values = np.zeros((n_samples, n_features, n_outputs), dtype=float)
         path_chunk_size = max(1, int(np.sqrt(self.batch_size)))
 
-        for baseline_row in baseline:
+        for baseline_row, baseline_weight in zip(baseline, baseline_weights):
             difference = data - baseline_row
             integrated = np.zeros_like(values)
             n_path_points = self.n_steps * n_samples
@@ -96,10 +101,9 @@ class FiniteDifferenceBackend:
                 ]
                 np.add.at(integrated, sample_indices, weighted)
 
-            values += difference[:, :, None] * integrated
+            values += baseline_weight * difference[:, :, None] * integrated
 
-        values /= baseline.shape[0]
-        mean_base_value = self._model_output(baseline).mean(axis=0)
+        mean_base_value = baseline_weights @ self._model_output(baseline)
         base_values = np.broadcast_to(
             mean_base_value, (n_samples, n_outputs)
         ).copy()

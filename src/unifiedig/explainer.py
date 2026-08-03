@@ -27,10 +27,11 @@ _BACKENDS: Sequence[Type[Backend]] = (
 class Explainer:
     """Explain a model with Integrated Gradients through one stable interface.
 
-    ``baseline`` is either one reference sample or an equally weighted shared
-    baseline distribution. Every input is attributed against every baseline;
-    matching input and baseline row counts do not imply pairing. ``n_steps``
-    controls numerical backends and is ignored by exact backends.
+    ``baseline`` is either one reference sample, a shared baseline matrix, or
+    a background object exposing aligned ``rows`` and ``weights`` properties.
+    Every input is attributed against every baseline; matching input and
+    baseline row counts do not imply pairing. ``n_steps`` controls numerical
+    backends and is ignored by exact backends.
 
     Binary classifiers are explained on their decision-score (logit) scale in
     V1. Probability attributions are intentionally not offered. Set
@@ -43,6 +44,7 @@ class Explainer:
         model: object,
         baseline: Any,
         *,
+        baseline_weights: Optional[Any] = None,
         n_steps: int = 64,
         check_completeness: bool = True,
         completeness_atol: float = 1e-6,
@@ -71,6 +73,7 @@ class Explainer:
             raise ValueError("finite_difference_batch_size must be a positive integer")
         self.model = model
         self.baseline = baseline
+        self.baseline_weights = baseline_weights
         self.n_steps = n_steps
         self.check_completeness = check_completeness
         self.completeness_atol = self._validate_tolerance(
@@ -104,17 +107,26 @@ class Explainer:
     def __call__(self, data: Any) -> Explanation:
         feature_names = self._feature_names(data)
         if getattr(self._backend, "input_kind", "numpy") == "torch":
-            normalized_data, normalized_baseline = normalize_torch_inputs(
+            (
+                normalized_data,
+                normalized_baseline,
+                normalized_weights,
+            ) = normalize_torch_inputs(
                 data,
                 self.baseline,
+                self.baseline_weights,
                 device=self._backend.device,
                 dtype=self._backend.dtype,
             )
             explanation_data = normalized_data.detach().cpu().numpy()
         else:
-            normalized_data, normalized_baseline = normalize_inputs(data, self.baseline)
+            normalized_data, normalized_baseline, normalized_weights = normalize_inputs(
+                data, self.baseline, self.baseline_weights
+            )
             explanation_data = normalized_data
-        backend_result = self._backend.explain(normalized_data, normalized_baseline)
+        backend_result = self._backend.explain(
+            normalized_data, normalized_baseline, normalized_weights
+        )
         if backend_result.output_values.ndim == 1:
             attribution_axes = tuple(range(1, backend_result.values.ndim))
         else:

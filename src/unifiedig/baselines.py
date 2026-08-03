@@ -1,6 +1,6 @@
 """Input and baseline normalization shared by all backends."""
 
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -43,21 +43,77 @@ def normalize_baseline(
     return np.ascontiguousarray(array)
 
 
-def normalize_inputs(data: Any, baseline: Any) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
-    """Normalize data and a baseline distribution into separate matrices."""
+def _baseline_parts(
+    baseline: Any, baseline_weights: Optional[Any]
+) -> Tuple[Any, Optional[Any]]:
+    """Resolve a matrix or a background object exposing rows and weights."""
+
+    has_rows = hasattr(baseline, "rows")
+    has_weights = hasattr(baseline, "weights")
+    if has_rows != has_weights:
+        raise TypeError(
+            "a baseline background object must expose both rows and weights"
+        )
+    if has_rows:
+        if baseline_weights is not None:
+            raise ValueError(
+                "baseline_weights must be omitted when baseline supplies weights"
+            )
+        return baseline.rows, baseline.weights
+    return baseline, baseline_weights
+
+
+def normalize_baseline_weights(
+    weights: Optional[Any], *, n_baselines: int
+) -> NDArray[np.floating]:
+    """Validate and normalize weights for a shared baseline distribution."""
+
+    if weights is None:
+        return np.full(n_baselines, 1.0 / n_baselines, dtype=float)
+    array = np.asarray(weights, dtype=float)
+    if array.ndim != 1 or array.shape[0] != n_baselines:
+        raise ValueError("baseline_weights must align with baseline rows")
+    if not np.isfinite(array).all() or np.any(array < 0):
+        raise ValueError("baseline_weights must be finite and nonnegative")
+    total = float(array.sum())
+    if total <= 0:
+        raise ValueError("baseline_weights must have a positive sum")
+    return np.ascontiguousarray(array / total)
+
+
+def normalize_inputs(
+    data: Any, baseline: Any, baseline_weights: Optional[Any] = None
+) -> Tuple[
+    NDArray[np.floating], NDArray[np.floating], NDArray[np.floating]
+]:
+    """Normalize data and a weighted baseline distribution."""
 
     normalized_data = normalize_data(data)
+    baseline, baseline_weights = _baseline_parts(baseline, baseline_weights)
     normalized_baseline = normalize_baseline(
         baseline,
         n_features=normalized_data.shape[1],
     )
-    return normalized_data, normalized_baseline
+    normalized_weights = normalize_baseline_weights(
+        baseline_weights, n_baselines=normalized_baseline.shape[0]
+    )
+    positive = normalized_weights > 0
+    return (
+        normalized_data,
+        normalized_baseline[positive],
+        normalized_weights[positive],
+    )
 
 
 def normalize_torch_inputs(
-    data: Any, baseline: Any, *, device: Any, dtype: Any
-) -> Tuple[Any, Any]:
-    """Normalize PyTorch inputs and a shared baseline distribution."""
+    data: Any,
+    baseline: Any,
+    baseline_weights: Optional[Any] = None,
+    *,
+    device: Any,
+    dtype: Any,
+) -> Tuple[Any, Any, Any]:
+    """Normalize PyTorch inputs and a weighted baseline distribution."""
 
     try:
         import torch
@@ -77,6 +133,7 @@ def normalize_torch_inputs(
     if not torch.isfinite(normalized_data).all():
         raise ValueError("data must contain only finite values")
 
+    baseline, baseline_weights = _baseline_parts(baseline, baseline_weights)
     baseline_source = (
         baseline.to_numpy() if hasattr(baseline, "to_numpy") else baseline
     )
@@ -108,4 +165,16 @@ def normalize_torch_inputs(
         raise ValueError("baseline distribution must contain at least one row")
     if not torch.isfinite(normalized_baseline).all():
         raise ValueError("baseline must contain only finite values")
-    return normalized_data, normalized_baseline
+    normalized_weights_array = normalize_baseline_weights(
+        baseline_weights, n_baselines=normalized_baseline.shape[0]
+    )
+    positive = normalized_weights_array > 0
+    normalized_baseline = normalized_baseline[
+        torch.as_tensor(positive, device=normalized_data.device)
+    ]
+    normalized_weights = torch.as_tensor(
+        normalized_weights_array[positive],
+        device=normalized_data.device,
+        dtype=normalized_data.dtype,
+    )
+    return normalized_data, normalized_baseline, normalized_weights

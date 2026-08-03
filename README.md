@@ -105,7 +105,8 @@ Optional capabilities are installed separately:
 | Exact sklearn, XGBoost, and LightGBM tree attribution | `pip install "unifiedig[trees]"` |
 | PyTorch attribution through Captum | `pip install "unifiedig[torch]"` |
 | Conversion to `shap.Explanation` | `pip install "unifiedig[shap]"` |
-| All currently released optional capabilities | `pip install "unifiedig[all]"` |
+| Prediction-neutral weighted backgrounds | `pip install cbaseline` |
+| All UnifiedIG backend and adapter extras | `pip install "unifiedig[all]"` |
 
 XGBoost and LightGBM models also require their respective model packages. JAX
 is planned but is not included in the current release.
@@ -146,8 +147,8 @@ to identify the backend themselves.
 ## Baselines and CBaseline
 
 The baseline defines the reference prediction from which the explanation
-starts. Unified IG accepts one baseline observation or an equally weighted
-baseline distribution:
+starts. Unified IG accepts one baseline observation or a shared baseline
+distribution. Matrix rows receive equal weight by default:
 
 ```python
 background = X_train[:100]
@@ -158,8 +159,20 @@ Every evaluation observation is compared with every background row. Equal
 input and background row counts never imply row-by-row pairing. Unified IG
 averages the paths and baseline outputs over the complete shared distribution.
 
+Supply explicit weights when the reference distribution is not uniform:
+
+```python
+explanation = uig.Explainer(
+    model,
+    background,
+    baseline_weights=weights,
+)(X_eval)
+```
+
+Weights must be finite, nonnegative, and aligned with the background rows.
+Unified IG normalizes them to sum to one.
+
 For a principled prediction-neutral reference distribution, use the
-equal-weight rows constructed by
 [CBaseline](https://pypi.org/project/cbaseline/):
 
 ```python
@@ -170,17 +183,17 @@ bg = background(
     predictions=f_train,
     f0=float(f_train.mean()),
     features=X_train,
-    weighting="equal",
-    size=100,
+    weighting="calibrated",
 )
 
-explanation = uig.Explainer(model, bg.rows)(X_eval)
+explanation = uig.Explainer(model, bg)(X_eval)
 ```
 
-This produces attributions relative to the requested reference prediction
-while keeping the background supported by observed data. Unified IG currently
-treats background matrices as equally weighted; weighted CBaseline backgrounds
-are not consumed directly.
+Unified IG recognizes CBaseline's `rows` and `weights` properties directly,
+without requiring CBaseline as a core dependency. Equal, kernel-weighted, and
+calibrated backgrounds therefore use the same explainer call. This produces
+attributions relative to the constructed reference distribution while keeping
+the background supported by observed data.
 
 ## Why Integrated Gradients rather than SHAP attribution?
 
@@ -212,7 +225,7 @@ The default choices are designed to make the common case short:
 | Regression output | Model prediction |
 | Binary classification output | Positive-class decision score, logit, or raw margin |
 | Probability attribution | Not offered |
-| Baseline matrix | Shared, equally weighted distribution |
+| Baseline matrix | Shared distribution; equally weighted unless weights are supplied |
 | Path | Straight line from each baseline to each input |
 | Numerical integration | 64-point Gauss–Legendre quadrature |
 | Completeness checking | Enabled |
@@ -369,7 +382,6 @@ Also deferred:
 
 - multiclass output targeting;
 - exact piecewise-linear integration at ReLU activation boundaries;
-- weighted baseline distributions;
 - multiple-input PyTorch models; and
 - a public third-party backend registry.
 

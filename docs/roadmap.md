@@ -8,15 +8,25 @@
 - Preserve a constant-Jacobian fast path for exact affine attribution.
 - Provide an opt-in, batched finite-difference fallback for other smooth
   sklearn estimators.
+- Support weighted baseline distributions and CBaseline `Background` objects
+  uniformly across all backends.
 - Document the complete model inventory, output semantics, baseline behavior,
   numerical diagnostics, and SHAP plotting adapter.
+
+## Next attribution capability — multiclass scores
+
+Treat multiclass classification as attribution of one centered decision-score
+vector with `K - 1` effective dimensions, represented by `K` labeled,
+zero-sum score coordinates. Add multi-output completeness and pairwise score
+contrasts without offering probability attribution or independent
+target-class explanations.
 
 ## Next model backend — JAX
 
 Add optional JAX support for differentiable batched prediction functions with:
 
 - parameters supplied explicitly or captured in a closure;
-- one raw scalar output per sample;
+- scalar or centered multiclass score output per sample;
 - native JAX automatic gradients;
 - Gauss–Legendre path integration;
 - shared baseline distributions;
@@ -29,6 +39,7 @@ classes.
 
 ## Before the next published release
 
+- Stabilize the centered-score multiclass shape and completeness contract.
 - Stabilize the JAX constructor and optional dependency extra.
 - Add a JAX example and dedicated GitHub Actions job.
 - Run source-tree and installed-wheel tests for all optional backends.
@@ -37,7 +48,6 @@ classes.
 
 ## Deferred work
 
-- Multiclass output targeting.
 - TensorFlow support.
 - Exact piecewise-linear IG for ReLU networks by detecting activation-region
   transitions along the baseline path.

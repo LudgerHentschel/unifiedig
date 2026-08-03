@@ -51,6 +51,30 @@ def test_random_forest_uses_shared_baseline_distribution():
     )
 
 
+def test_random_forest_uses_weighted_baseline_distribution():
+    from sklearn.ensemble import RandomForestRegressor
+
+    X, y = _regression_data(seed=5)
+    model = RandomForestRegressor(
+        n_estimators=8, max_depth=5, random_state=5
+    ).fit(X, y)
+    data = X[20:26]
+    baselines = X[:3]
+    weights = np.array([0.1, 0.2, 0.7])
+
+    explanation = uig.Explainer(
+        model, baselines, baseline_weights=weights
+    )(data)
+
+    expected_base_value = weights @ model.predict(baselines)
+    np.testing.assert_allclose(explanation.base_values, expected_base_value)
+    np.testing.assert_allclose(
+        explanation.values.sum(axis=1),
+        model.predict(data) - expected_base_value,
+        atol=1e-10,
+    )
+
+
 @pytest.mark.parametrize(
     "estimator_name", ["ExtraTreesRegressor", "GradientBoostingRegressor"]
 )

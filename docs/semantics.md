@@ -12,13 +12,27 @@ explanation = unifiedig.Explainer(model, baseline)(data)
 For sklearn, `data` is one sample with shape `(features,)` or a batch with shape
 `(samples, features)`. PyTorch additionally accepts structured single-tensor
 inputs with any shape `(samples, ...)`. A baseline may be a scalar, one sample,
-or a baseline distribution with shape `(baselines, ...)`. Unified IG—not
-individual backends—validates the baseline distribution.
+or a baseline distribution with shape `(baselines, ...)`. Optional
+`baseline_weights` must align with its rows. A background object exposing
+`rows` and `weights`, including a CBaseline `Background`, may be passed
+directly. Unified IG—not individual backends—validates and normalizes the
+distribution.
 
 Every input is attributed from the same baseline distribution. Unified IG
 averages its Integrated Gradients paths over the distribution; it never infers
-row pairing from equal input and baseline counts. Baseline rows receive equal
-weight in V1.
+row pairing from equal input and baseline counts. Matrix rows receive equal
+weight by default. Explicit weights must be finite and nonnegative with a
+positive sum; Unified IG normalizes them to sum to one.
+
+For normalized weights `w_b`, the explanation averages complete paths:
+
+```text
+values = sum_b w_b * IG(data; baseline_b)
+base_values = sum_b w_b * model_output(baseline_b)
+```
+
+Passing a background object and also supplying `baseline_weights` is rejected
+so that there is only one source of weighting semantics.
 
 ## Explanation arrays
 

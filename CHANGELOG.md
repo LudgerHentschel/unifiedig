@@ -9,6 +9,9 @@
 - Add an opt-in, batched finite-difference fallback for other smooth sklearn
   regressors and binary decision-score classifiers.
 - Reject known discontinuous estimator families from the numerical fallback.
+- Support explicit weighted baseline distributions across every backend and
+  consume CBaseline `Background` objects directly through their public
+  `rows` and `weights` properties.
 - Expand the README with computation routes, model coverage, baseline guidance,
   SHAP plotting, numerical diagnostics, and the planned JAX scope.
 

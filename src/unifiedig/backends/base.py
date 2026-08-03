@@ -25,6 +25,8 @@ class Backend(Protocol):
 
     def __init__(self, model: object, *, n_steps: int = 64) -> None: ...
 
-    def explain(self, data: Any, baseline: Any) -> BackendResult:
+    def explain(
+        self, data: Any, baseline: Any, baseline_weights: Any
+    ) -> BackendResult:
         """Return attribution values, baseline outputs, and output names."""
         ...

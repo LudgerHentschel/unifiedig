@@ -75,11 +75,18 @@ class TreeIGBackend:
         self,
         data: NDArray[np.floating],
         baseline: NDArray[np.floating],
+        baseline_weights: NDArray[np.floating],
     ) -> BackendResult:
-        values = self._explainer.attribute(data, baseline=baseline)
+        values = self._explainer.attribute(
+            data,
+            baseline=baseline,
+            baseline_weights=baseline_weights,
+        )
 
         output_values = self._explainer.model_output(data)
-        mean_base_value = self._explainer.model_output(baseline).mean()
+        mean_base_value = float(
+            baseline_weights @ self._explainer.model_output(baseline)
+        )
         base_values = np.full(data.shape[0], mean_base_value)
         output_names: Optional[Sequence[str]] = None
         classes = getattr(self.model, "classes_", None)

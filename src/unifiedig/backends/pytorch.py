@@ -38,17 +38,21 @@ class PyTorchBackend:
         self.dtype = reference.dtype if reference is not None else None
         self._integrated_gradients = IntegratedGradients(self._forward_scalar)
 
-    def explain(self, data: Any, baseline: Any) -> BackendResult:
+    def explain(
+        self, data: Any, baseline: Any, baseline_weights: Any
+    ) -> BackendResult:
         module_states: Dict[Any, bool] = {
             module: module.training for module in self.model.modules()
         }
         self.model.eval()
         try:
             output_values = self._output(data)
-            mean_base_value = self._output(baseline).mean()
+            mean_base_value = (baseline_weights * self._output(baseline)).sum()
             base_values = mean_base_value.expand(data.shape[0]).clone()
             attributions = None
-            for baseline_row in baseline:
+            for baseline_row, baseline_weight in zip(
+                baseline, baseline_weights
+            ):
                 contribution = self._integrated_gradients.attribute(
                     data,
                     baselines=baseline_row.unsqueeze(0),
@@ -56,11 +60,10 @@ class PyTorchBackend:
                     method="gausslegendre",
                 )
                 if attributions is None:
-                    attributions = contribution
+                    attributions = baseline_weight * contribution
                 else:
-                    attributions += contribution
+                    attributions += baseline_weight * contribution
             assert attributions is not None
-            attributions /= baseline.shape[0]
         finally:
             for module, training in module_states.items():
                 module.training = training
