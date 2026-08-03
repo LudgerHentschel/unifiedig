@@ -8,6 +8,7 @@ import numpy as np
 
 from .backends import (
     Backend,
+    FiniteDifferenceBackend,
     PyTorchBackend,
     SkgradBackend,
     TreeIGBackend,
@@ -32,7 +33,9 @@ class Explainer:
     controls numerical backends and is ignored by exact backends.
 
     Binary classifiers are explained on their decision-score (logit) scale in
-    V1. Probability attributions are intentionally not offered.
+    V1. Probability attributions are intentionally not offered. Set
+    ``fallback="finite_difference"`` to explain an otherwise unsupported smooth
+    sklearn estimator numerically; specialized backends always take precedence.
     """
 
     def __init__(
@@ -44,11 +47,28 @@ class Explainer:
         check_completeness: bool = True,
         completeness_atol: float = 1e-6,
         completeness_rtol: float = 1e-4,
+        fallback: Optional[str] = None,
+        finite_difference_step: float = 1e-5,
+        finite_difference_batch_size: int = 8192,
     ) -> None:
         if not isinstance(n_steps, int) or isinstance(n_steps, bool) or n_steps < 1:
             raise ValueError("n_steps must be a positive integer")
         if not isinstance(check_completeness, bool):
             raise ValueError("check_completeness must be a boolean")
+        if fallback not in (None, "finite_difference"):
+            raise ValueError("fallback must be None or 'finite_difference'")
+        if (
+            not isinstance(finite_difference_step, Real)
+            or isinstance(finite_difference_step, bool)
+            or finite_difference_step <= 0
+        ):
+            raise ValueError("finite_difference_step must be a positive number")
+        if (
+            not isinstance(finite_difference_batch_size, int)
+            or isinstance(finite_difference_batch_size, bool)
+            or finite_difference_batch_size < 1
+        ):
+            raise ValueError("finite_difference_batch_size must be a positive integer")
         self.model = model
         self.baseline = baseline
         self.n_steps = n_steps
@@ -61,8 +81,25 @@ class Explainer:
         )
         backend_type = next((item for item in _BACKENDS if item.supports(model)), None)
         if backend_type is None:
-            raise TypeError(f"no Unified IG backend supports {type(model).__name__}")
-        self._backend = backend_type(model, n_steps=n_steps)
+            if fallback is None:
+                raise TypeError(
+                    f"no Unified IG backend supports {type(model).__name__}; "
+                    "set fallback='finite_difference' for a smooth sklearn estimator"
+                )
+            self._backend = FiniteDifferenceBackend(
+                model,
+                n_steps=n_steps,
+                relative_step=float(finite_difference_step),
+                batch_size=finite_difference_batch_size,
+            )
+            warnings.warn(
+                "Using finite-difference gradients; attribution may be substantially "
+                "slower than a specialized backend.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        else:
+            self._backend = backend_type(model, n_steps=n_steps)
 
     def __call__(self, data: Any) -> Explanation:
         feature_names = self._feature_names(data)

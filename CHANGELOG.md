@@ -6,6 +6,9 @@
 - Recognize every smooth estimator supported by skgrad through one capability
   check, including Ridge, Lasso, ElasticNet, and RidgeClassifier.
 - Document the complete supported-model inventory and output scales.
+- Add an opt-in, batched finite-difference fallback for other smooth sklearn
+  regressors and binary decision-score classifiers.
+- Reject known discontinuous estimator families from the numerical fallback.
 
 ## 0.1.0
 

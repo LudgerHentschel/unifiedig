@@ -72,3 +72,16 @@ Numerical backends use Gauss–Legendre quadrature on the unit path interval.
 `Explainer(..., n_steps=N)` controls the number of quadrature nodes. More nodes
 usually improve accuracy but require proportionally more gradient evaluations.
 The default is 64.
+
+When explicitly enabled with `fallback="finite_difference"`, Unified IG uses
+central finite differences to approximate gradients for otherwise unsupported
+smooth sklearn estimators. The step for coordinate `j` is
+`finite_difference_step * max(1, abs(x_j))` at each path point. Perturbed rows
+are evaluated in bounded batches.
+
+This fallback requires `predict` for regression or `decision_function` for
+binary classification. Probability outputs are never inferred. Known tree and
+nearest-neighbor estimators are rejected because their local finite-difference
+gradients do not represent path discontinuities reliably. A small completeness
+residual is an important numerical diagnostic, but it is not a general proof
+that a model is smooth or that every individual attribution is accurate.

@@ -67,6 +67,34 @@ Unified IG warns when this error exceeds the configured tolerance. Increasing
 `n_steps` usually improves it. See the `examples/` directory for complete
 linear, logistic, MLP regression, and MLP classification programs.
 
+## Numerical fallback
+
+An otherwise unsupported smooth sklearn estimator can be explained with
+batched central finite differences:
+
+```python
+explainer = uig.Explainer(
+    model,
+    baseline,
+    fallback="finite_difference",
+)
+explanation = explainer(X)
+```
+
+Specialized backends always take precedence. The fallback supports fitted
+sklearn regressors with `predict` and binary classifiers with
+`decision_function`; it never substitutes probability outputs. It can be much
+slower because its work grows with the number of features, quadrature nodes,
+inputs, and baselines. `finite_difference_step` controls the relative central
+difference step, and `finite_difference_batch_size` bounds the number of
+perturbed rows evaluated together.
+
+Finite differences are inappropriate for piecewise-constant models because
+local gradients generally miss their discontinuities. Known tree and
+nearest-neighbor families are therefore rejected rather than given misleading
+attributions. Completeness diagnostics should be inspected carefully for every
+fallback result.
+
 ## Supported models
 
 Unified IG currently recognizes the following fitted estimators:
@@ -82,8 +110,9 @@ Unified IG currently recognizes the following fitted estimators:
 | XGBoost | `XGBRegressor`, binary `XGBClassifier`, and compatible native `Booster` models | Prediction or raw margin | Exact via TreeIG |
 | LightGBM | `LGBMRegressor`, binary `LGBMClassifier`, and compatible native `Booster` models | Prediction or raw score | Exact via TreeIG |
 | PyTorch | `torch.nn.Module` with one raw scalar output per sample | Model output | Captum Gauss–Legendre IG |
+| Other smooth sklearn estimators | Regressors with `predict`; binary classifiers with `decision_function` | Prediction or decision score | Opt-in finite differences and Gauss–Legendre quadrature |
 
-All smooth sklearn models are recognized through the single
+Specialized smooth sklearn models are recognized through the single
 `skgrad.supports()` predicate, while tree models are recognized through
 `treeig.supports()`. This keeps estimator registries in their owning packages
 so additions can flow into Unified IG without duplicating model lists in its
@@ -91,8 +120,9 @@ dispatch layer. skgrad's constant-Jacobian metadata preserves the exact affine
 fast path without exposing separate model-family support predicates.
 
 V1 intentionally rejects multiclass classifiers because `Explainer` does not
-yet expose an output target. Multi-output affine and MLP regressors are
-supported. MLP hidden activations may be identity, logistic, tanh, or ReLU;
+yet expose an output target. Multi-output regressors are supported when their
+output follows the documented array contract. MLP hidden activations may be
+identity, logistic, tanh, or ReLU;
 `MLPRegressor` models with a non-identity output activation are rejected.
 TreeIG currently requires finite numeric inputs and numeric splits; its other
 documented exclusions also apply through Unified IG.
