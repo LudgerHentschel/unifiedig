@@ -3,6 +3,9 @@
 ## 0.1.1.dev0
 
 - Delegate analytic scikit-learn MLP values and input Jacobians to skgrad.
+- Recognize every smooth estimator supported by skgrad through one capability
+  check, including Ridge, Lasso, ElasticNet, and RidgeClassifier.
+- Document the complete supported-model inventory and output scales.
 
 ## 0.1.0
 

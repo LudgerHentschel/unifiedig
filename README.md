@@ -69,12 +69,33 @@ linear, logistic, MLP regression, and MLP classification programs.
 
 ## Supported models
 
-- `sklearn.linear_model.LinearRegression` (closed form)
-- Binary `sklearn.linear_model.LogisticRegression` (closed form)
-- `sklearn.neural_network.MLPRegressor` (analytic gradients and quadrature)
-- Binary `sklearn.neural_network.MLPClassifier` (analytic logit gradients and quadrature)
-- PyTorch modules with one raw scalar output per sample (Captum, optional)
-- TreeIG-supported sklearn, XGBoost, and LightGBM trees (exact, optional)
+Unified IG currently recognizes the following fitted estimators:
+
+| Model family | Supported estimators | Explained output | Method |
+|---|---|---|---|
+| sklearn affine regression | `LinearRegression`, `Ridge`, `Lasso`, `ElasticNet` | Prediction | Exact closed form via skgrad |
+| sklearn affine classification | Binary `LogisticRegression`, `RidgeClassifier` | Decision score | Exact closed form via skgrad |
+| sklearn neural networks | Identity-output `MLPRegressor` | Prediction | Analytic skgrad Jacobians with Gauss–Legendre quadrature |
+| sklearn neural networks | Binary `MLPClassifier` | Pre-probability logit | Analytic skgrad Jacobians with Gauss–Legendre quadrature |
+| sklearn trees | `DecisionTreeRegressor`, `RandomForestRegressor`, `ExtraTreesRegressor`, `GradientBoostingRegressor` | Prediction | Exact via TreeIG |
+| sklearn boosted trees | Binary `GradientBoostingClassifier` | Decision score | Exact via TreeIG |
+| XGBoost | `XGBRegressor`, binary `XGBClassifier`, and compatible native `Booster` models | Prediction or raw margin | Exact via TreeIG |
+| LightGBM | `LGBMRegressor`, binary `LGBMClassifier`, and compatible native `Booster` models | Prediction or raw score | Exact via TreeIG |
+| PyTorch | `torch.nn.Module` with one raw scalar output per sample | Model output | Captum Gauss–Legendre IG |
+
+All smooth sklearn models are recognized through the single
+`skgrad.supports()` predicate, while tree models are recognized through
+`treeig.supports()`. This keeps estimator registries in their owning packages
+so additions can flow into Unified IG without duplicating model lists in its
+dispatch layer. skgrad's constant-Jacobian metadata preserves the exact affine
+fast path without exposing separate model-family support predicates.
+
+V1 intentionally rejects multiclass classifiers because `Explainer` does not
+yet expose an output target. Multi-output affine and MLP regressors are
+supported. MLP hidden activations may be identity, logistic, tanh, or ReLU;
+`MLPRegressor` models with a non-identity output activation are rejected.
+TreeIG currently requires finite numeric inputs and numeric splits; its other
+documented exclusions also apply through Unified IG.
 
 Install PyTorch support separately so the core package remains lightweight:
 
@@ -87,6 +108,8 @@ Install exact tree-model support separately:
 ```console
 pip install "unifiedig[trees]"
 ```
+
+XGBoost and LightGBM models additionally require their respective packages.
 
 Tree attributions are computed by TreeIG; Unified IG normalizes the input and
 baseline and adapts TreeIG's exact result to `Explanation`.

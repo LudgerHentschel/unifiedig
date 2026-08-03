@@ -23,6 +23,13 @@ Stabilize the public API and documented output semantics.
 
 ## Future work
 
+Refactor smooth-model integration around a small gradient-provider protocol.
+skgrad should remain the provider for analytic sklearn gradients; PyTorch and
+JAX adapters should obtain gradients from their native autodiff systems while
+isolating framework-specific array, device, dtype, and execution-state details
+from the Unified IG core. New providers should be registerable without adding
+model-type lists to `Explainer`.
+
 Investigate exact piecewise-linear IG for ReLU networks by detecting activation
 region transitions along the baseline path. This is analogous to partitioning a
 tree path at decision-boundary crossings and may improve both accuracy and

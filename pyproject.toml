@@ -20,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
-dependencies = ["numpy>=1.23", "scikit-learn>=1.2", "skgrad>=0.1.0"]
+dependencies = ["numpy>=1.23", "scikit-learn>=1.2", "skgrad>=0.1.1"]
 
 [project.optional-dependencies]
 shap = ["shap>=0.42"]

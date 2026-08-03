@@ -9,8 +9,7 @@ import numpy as np
 from .backends import (
     Backend,
     PyTorchBackend,
-    SklearnLinearBackend,
-    SklearnMLPBackend,
+    SkgradBackend,
     TreeIGBackend,
 )
 from .baselines import normalize_inputs, normalize_torch_inputs
@@ -18,8 +17,7 @@ from .explanation import Explanation
 
 
 _BACKENDS: Sequence[Type[Backend]] = (
-    SklearnLinearBackend,
-    SklearnMLPBackend,
+    SkgradBackend,
     TreeIGBackend,
     PyTorchBackend,
 )

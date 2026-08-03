@@ -51,6 +51,29 @@ def test_random_forest_uses_shared_baseline_distribution():
     )
 
 
+@pytest.mark.parametrize(
+    "estimator_name", ["ExtraTreesRegressor", "GradientBoostingRegressor"]
+)
+def test_other_sklearn_treeig_regressors_are_recognized(estimator_name):
+    from sklearn import ensemble
+
+    X, y = _regression_data(seed=4)
+    estimator_type = getattr(ensemble, estimator_name)
+    if estimator_name == "ExtraTreesRegressor":
+        model = estimator_type(n_estimators=8, max_depth=4, random_state=4)
+    else:
+        model = estimator_type(n_estimators=8, max_depth=2, random_state=4)
+    model.fit(X, y)
+    data = X[20:25]
+    explanation = uig.Explainer(model, X[:3])(data)
+
+    np.testing.assert_allclose(
+        explanation.values.sum(axis=1) + explanation.base_values,
+        model.predict(data),
+        atol=1e-10,
+    )
+
+
 def test_binary_gradient_boosting_uses_decision_scores():
     from sklearn.ensemble import GradientBoostingClassifier
 
