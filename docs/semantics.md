@@ -55,8 +55,36 @@ when available, identify the final axis.
 
 Regression backends explain the model prediction. Binary classification
 backends explain the decision score (logit), with the positive class as the
-named output. Probability attribution is intentionally excluded from V1.
-Multiclass classification is not yet supported.
+named output. If a model returns two raw binary scores, Unified IG explains
+their difference, `score[1] - score[0]`.
+
+For multiclass classification, let `z(x)` be the model's vector of `K` raw
+class scores. Unified IG explains the centered score vector
+
+```text
+s(x) = z(x) - mean(z(x) over classes).
+```
+
+The `K` labeled coordinates sum to zero and represent a `K - 1` dimensional
+decision-score object. This removes the common-score direction without
+choosing an arbitrary reference class. Completeness holds separately for every
+centered score:
+
+```text
+sum_j values[i, j, k] + base_values[i, k] = s_k(data[i]).
+```
+
+The stronger zero-sum identities also hold up to floating-point error:
+
+```text
+sum_k values[i, j, k] = 0
+sum_k base_values[i, k] = 0.
+```
+
+`Explanation.contrast(a, b)` subtracts two stored coordinates to recover IG
+for the invariant pairwise margin `z_a - z_b`, without recomputing gradients
+or paths. Independent target-class attribution is not a separate Unified IG
+estimand. Probability attribution is intentionally excluded.
 
 ## Completeness
 
@@ -94,8 +122,10 @@ smooth sklearn estimators. The step for coordinate `j` is
 are evaluated in bounded batches.
 
 This fallback requires `predict` for regression or `decision_function` for
-binary classification. Probability outputs are never inferred. Known tree and
-nearest-neighbor estimators are rejected because their local finite-difference
-gradients do not represent path discontinuities reliably. A small completeness
-residual is an important numerical diagnostic, but it is not a general proof
-that a model is smooth or that every individual attribution is accurate.
+classification. Multiclass decision functions must return one score per class;
+pairwise-derived SVC scores are rejected. Probability outputs are never
+inferred. Known tree and nearest-neighbor estimators are rejected because their
+local finite-difference gradients do not represent path discontinuities
+reliably. A small completeness residual is an important numerical diagnostic,
+but it is not a general proof that a model is smooth or that every individual
+attribution is accurate.

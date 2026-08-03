@@ -15,6 +15,48 @@ class BackendResult(NamedTuple):
     output_names: Optional[Sequence[str]]
 
 
+def classification_score_result(
+    values: NDArray[np.floating],
+    base_values: NDArray[np.floating],
+    output_values: NDArray[np.floating],
+    class_names: Sequence[str],
+) -> BackendResult:
+    """Represent a vector of raw class scores in its nonredundant space.
+
+    Two-class score vectors become the single margin ``score[1] - score[0]``.
+    For three or more classes, scores and their attributions are centered
+    across classes. The stored ``K`` labeled coordinates therefore span the
+    classifier's ``K - 1`` dimensional decision-score space.
+    """
+
+    values = np.asarray(values)
+    base_values = np.asarray(base_values)
+    output_values = np.asarray(output_values)
+    names = [str(name) for name in class_names]
+    n_outputs = output_values.shape[-1]
+    if n_outputs < 2:
+        raise ValueError("classification score vectors require at least two outputs")
+    if len(names) != n_outputs:
+        raise ValueError("class names must align with classification scores")
+    if values.shape[-1] != n_outputs or base_values.shape[-1] != n_outputs:
+        raise ValueError("classification score arrays must share an output axis")
+
+    if n_outputs == 2:
+        return BackendResult(
+            values[..., 1] - values[..., 0],
+            base_values[..., 1] - base_values[..., 0],
+            output_values[..., 1] - output_values[..., 0],
+            [names[1]],
+        )
+
+    return BackendResult(
+        values - values.mean(axis=-1, keepdims=True),
+        base_values - base_values.mean(axis=-1, keepdims=True),
+        output_values - output_values.mean(axis=-1, keepdims=True),
+        names,
+    )
+
+
 class Backend(Protocol):
     """Internal protocol hidden behind :class:`unifiedig.Explainer`."""
 

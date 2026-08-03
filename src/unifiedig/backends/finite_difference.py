@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 from sklearn.base import is_classifier, is_regressor
 from sklearn.utils.validation import check_is_fitted
 
-from .base import BackendResult
+from .base import BackendResult, classification_score_result
 
 
 FloatArray = NDArray[np.floating]
@@ -54,8 +54,15 @@ class FiniteDifferenceBackend:
         if not hasattr(model, "n_features_in_"):
             raise ValueError("model must expose n_features_in_")
         classes = getattr(model, "classes_", None)
-        if classes is not None and len(classes) != 2:
-            raise ValueError("V1 supports only binary classifiers")
+        if (
+            classes is not None
+            and len(classes) > 2
+            and hasattr(model, "decision_function_shape")
+        ):
+            raise ValueError(
+                "multiclass finite differences require one decision score per "
+                "class; pairwise-derived SVC decision scores are unsupported"
+            )
 
         self.model = model
         self.n_steps = n_steps
@@ -109,6 +116,12 @@ class FiniteDifferenceBackend:
         ).copy()
         output_names = self._output_names(n_outputs)
 
+        if self._is_classifier and n_outputs >= 2:
+            assert output_names is not None
+            return classification_score_result(
+                values, base_values, output_values, output_names
+            )
+
         if n_outputs == 1:
             return BackendResult(
                 values[:, :, 0],
@@ -159,8 +172,16 @@ class FiniteDifferenceBackend:
             raise ValueError(
                 "model output must have shape (samples,) or (samples, outputs)"
             )
-        if self._is_classifier and output.shape[1] != 1:
-            raise ValueError("V1 requires one binary decision score per sample")
+        if self._is_classifier:
+            classes = getattr(self.model, "classes_", None)
+            expected_outputs = (
+                1 if classes is None or len(classes) == 2 else len(classes)
+            )
+            if output.shape[1] != expected_outputs:
+                raise ValueError(
+                    "classifier decision_function must return one binary margin "
+                    "or one score per multiclass label"
+                )
         if not np.isfinite(output).all():
             raise ValueError("model output must contain only finite values")
         return output
@@ -168,7 +189,9 @@ class FiniteDifferenceBackend:
     def _output_names(self, n_outputs: int) -> Optional[Sequence[str]]:
         classes = getattr(self.model, "classes_", None)
         if classes is not None:
-            return [str(classes[1])]
+            if n_outputs == 1:
+                return [str(classes[1])]
+            return [str(item) for item in classes]
         return [str(index) for index in range(n_outputs)] if n_outputs > 1 else None
 
     @staticmethod

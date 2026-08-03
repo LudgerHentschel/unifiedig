@@ -1,14 +1,14 @@
 """Optional Captum-backed Integrated Gradients for PyTorch modules."""
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 
-from .base import BackendResult
+from .base import BackendResult, classification_score_result
 
 
 class PyTorchBackend:
-    """Explain one raw scalar PyTorch model output per sample with Captum."""
+    """Explain raw scalar or class-score PyTorch outputs with Captum."""
 
     input_kind = "torch"
 
@@ -31,12 +31,13 @@ class PyTorchBackend:
             ) from exc
 
         self.model = model
+        self._torch = torch
         self.n_steps = n_steps
         tensors = list(model.parameters()) + list(model.buffers())
         reference = next((tensor for tensor in tensors if tensor.is_floating_point()), None)
         self.device = reference.device if reference is not None else None
         self.dtype = reference.dtype if reference is not None else None
-        self._integrated_gradients = IntegratedGradients(self._forward_scalar)
+        self._integrated_gradients = IntegratedGradients(self._forward)
 
     def explain(
         self, data: Any, baseline: Any, baseline_weights: Any
@@ -47,50 +48,86 @@ class PyTorchBackend:
         self.model.eval()
         try:
             output_values = self._output(data)
-            mean_base_value = (baseline_weights * self._output(baseline)).sum()
-            base_values = mean_base_value.expand(data.shape[0]).clone()
-            attributions = None
-            for baseline_row, baseline_weight in zip(
-                baseline, baseline_weights
-            ):
-                contribution = self._integrated_gradients.attribute(
-                    data,
-                    baselines=baseline_row.unsqueeze(0),
-                    n_steps=self.n_steps,
-                    method="gausslegendre",
+            baseline_outputs = self._output(baseline)
+            n_outputs = 1 if output_values.ndim == 1 else output_values.shape[1]
+            if n_outputs == 1:
+                mean_base_value = (baseline_weights * baseline_outputs).sum()
+                base_values = mean_base_value.expand(data.shape[0]).clone()
+                attributions = self._attribute_output(
+                    data, baseline, baseline_weights, target=None
                 )
-                if attributions is None:
-                    attributions = baseline_weight * contribution
-                else:
-                    attributions += baseline_weight * contribution
-            assert attributions is not None
+            else:
+                mean_base_value = (
+                    baseline_weights[:, None] * baseline_outputs
+                ).sum(dim=0)
+                base_values = mean_base_value.expand(
+                    data.shape[0], n_outputs
+                ).clone()
+                by_output = [
+                    self._attribute_output(
+                        data, baseline, baseline_weights, target=target
+                    )
+                    for target in range(n_outputs)
+                ]
+                attributions = self._torch.stack(by_output, dim=-1)
         finally:
             for module, training in module_states.items():
                 module.training = training
 
-        return BackendResult(
-            self._to_numpy(attributions),
-            self._to_numpy(base_values),
-            self._to_numpy(output_values),
-            None,
-        )
+        values_array = self._to_numpy(attributions)
+        base_array = self._to_numpy(base_values)
+        output_array = self._to_numpy(output_values)
+        if n_outputs >= 2:
+            return classification_score_result(
+                values_array,
+                base_array,
+                output_array,
+                [str(index) for index in range(n_outputs)],
+            )
+        return BackendResult(values_array, base_array, output_array, None)
 
-    def _forward_scalar(self, data: Any) -> Any:
+    def _attribute_output(
+        self,
+        data: Any,
+        baseline: Any,
+        baseline_weights: Any,
+        *,
+        target: Optional[int],
+    ) -> Any:
+        attributions = None
+        for baseline_row, baseline_weight in zip(baseline, baseline_weights):
+            contribution = self._integrated_gradients.attribute(
+                data,
+                baselines=baseline_row.unsqueeze(0),
+                target=target,
+                n_steps=self.n_steps,
+                method="gausslegendre",
+            )
+            if attributions is None:
+                attributions = baseline_weight * contribution
+            else:
+                attributions += baseline_weight * contribution
+        assert attributions is not None
+        return attributions
+
+    def _forward(self, data: Any) -> Any:
         output = self.model(data)
         if output.ndim == 1:
             return output
         if output.ndim == 2 and output.shape[1] == 1:
             return output[:, 0]
+        if output.ndim == 2 and output.shape[1] >= 2:
+            return output
         raise ValueError(
-            "V1 PyTorch support requires one raw scalar output per sample; "
-            "for binary classification, return the logit rather than a probability"
+            "PyTorch models must return one raw scalar or one raw score per "
+            "class for every sample"
         )
 
     def _output(self, data: Any) -> Any:
         import torch
 
         with torch.no_grad():
-            return self._forward_scalar(data)
+            return self._forward(data)
 
     @staticmethod
     def _to_numpy(tensor: Any) -> np.ndarray:

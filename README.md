@@ -51,13 +51,13 @@ Unified IG deliberately has no plotting subsystem of its own.
 The same public API currently covers:
 
 - linear and regularized linear sklearn models;
-- binary linear classifiers on their decision-score scale;
+- binary and multiclass linear classifiers on their decision-score scale;
 - sklearn multilayer perceptrons;
 - supported sklearn decision trees and ensembles;
 - XGBoost and LightGBM models supported by TreeIG;
-- scalar-output PyTorch modules; and
-- other smooth sklearn regressors and binary decision-score classifiers through
-  an explicit numerical fallback.
+- scalar-output and class-score PyTorch modules; and
+- other smooth sklearn regressors and decision-score classifiers through an
+  explicit numerical fallback.
 
 JAX support is the next planned model backend. See
 [Planned JAX support](#planned-jax-support).
@@ -137,7 +137,7 @@ Unified IG automatically selects the strongest available route:
 | Exact affine | Constant analytic Jacobian from skgrad | Closed form | Linear and regularized linear models |
 | Exact trees | TreeIG split-boundary traces | Exact | Supported sklearn, XGBoost, and LightGBM trees |
 | Differentiable sklearn | Analytic Jacobians from skgrad | Gauss–Legendre quadrature | sklearn MLPs |
-| PyTorch | Automatic gradients through Captum | Gauss–Legendre quadrature | Scalar-output `torch.nn.Module` models |
+| PyTorch | Automatic gradients through Captum | Gauss–Legendre quadrature | Scalar-output and class-score `torch.nn.Module` models |
 | Numerical fallback | Batched central finite differences | Gauss–Legendre quadrature | Other smooth sklearn estimators |
 
 Specialized routes always take precedence over the fallback. Users get exact
@@ -172,7 +172,7 @@ explanation = uig.Explainer(
 Weights must be finite, nonnegative, and aligned with the background rows.
 Unified IG normalizes them to sum to one.
 
-For a principled prediction-neutral reference distribution, use the
+For a principled prediction-neutral reference distribution, use
 [CBaseline](https://pypi.org/project/cbaseline/):
 
 ```python
@@ -194,6 +194,26 @@ without requiring CBaseline as a core dependency. Equal, kernel-weighted, and
 calibrated backgrounds therefore use the same explainer call. This produces
 attributions relative to the constructed reference distribution while keeping
 the background supported by observed data.
+
+For multiclass classification, construct one background for the complete
+centered score vector:
+
+```python
+scores = model.decision_function(X_train)
+centered_scores = scores - scores.mean(axis=1, keepdims=True)
+
+bg = background(
+    predictions=centered_scores,
+    f0=centered_scores.mean(axis=0),
+    features=X_train,
+    weighting="calibrated",
+)
+
+explanation = uig.Explainer(model, bg)(X_eval)
+```
+
+CBaseline detects the redundant common-score direction and constructs the
+background in the effective `K - 1` dimensional score space.
 
 ## Why Integrated Gradients rather than SHAP attribution?
 
@@ -224,6 +244,7 @@ The default choices are designed to make the common case short:
 | Backend | Automatically selected from the model |
 | Regression output | Model prediction |
 | Binary classification output | Positive-class decision score, logit, or raw margin |
+| Multiclass classification output | Complete centered decision-score vector |
 | Probability attribution | Not offered |
 | Baseline matrix | Shared distribution; equally weighted unless weights are supplied |
 | Path | Straight line from each baseline to each input |
@@ -253,11 +274,11 @@ Exact affine and tree routes ignore `n_steps`.
 | Ecosystem | Supported models | Explained output |
 |---|---|---|
 | sklearn affine regression | `LinearRegression`, `Ridge`, `Lasso`, `ElasticNet` | Prediction |
-| sklearn affine classification | Binary `LogisticRegression`, `RidgeClassifier` | Decision score |
+| sklearn affine classification | Binary and multiclass `LogisticRegression`, `RidgeClassifier` | Margin or centered score vector |
 | sklearn trees | `DecisionTreeRegressor`, `RandomForestRegressor`, `ExtraTreesRegressor`, `GradientBoostingRegressor` | Prediction |
-| sklearn boosted classification | Binary `GradientBoostingClassifier` | Decision score |
-| XGBoost | `XGBRegressor`, binary `XGBClassifier`, compatible native `Booster` models | Prediction or raw margin |
-| LightGBM | `LGBMRegressor`, binary `LGBMClassifier`, compatible native `Booster` models | Prediction or raw score |
+| sklearn boosted classification | Binary and multiclass `GradientBoostingClassifier` | Margin or centered score vector |
+| XGBoost | `XGBRegressor`, binary and multiclass `XGBClassifier`, compatible native `Booster` models | Prediction, margin, or centered score vector |
+| LightGBM | `LGBMRegressor`, binary and multiclass `LGBMClassifier`, compatible native `Booster` models | Prediction, margin, or centered score vector |
 
 Tree support is delegated to TreeIG. TreeIG's requirements and exclusions—such
 as finite numeric inputs and numeric splits—also apply through Unified IG.
@@ -267,13 +288,14 @@ as finite numeric inputs and numeric splits—also apply through Unified IG.
 | Ecosystem | Supported models | Explained output |
 |---|---|---|
 | sklearn neural networks | Identity-output `MLPRegressor` | Prediction |
-| sklearn neural networks | Binary `MLPClassifier` | Pre-probability logit |
-| PyTorch | `torch.nn.Module` with one raw scalar output per sample | Model output |
+| sklearn neural networks | Binary and multiclass `MLPClassifier` | Logit or centered logit vector |
+| PyTorch | `torch.nn.Module` with one raw scalar or one raw score per class | Model output or centered score vector |
 
 sklearn MLP hidden activations may be identity, logistic, tanh, or ReLU.
-Multi-output MLP regression is supported. PyTorch inputs may have any
-single-tensor sample shape; Unified IG preserves the module's device,
-floating-point dtype, and prior training/evaluation state.
+Multi-output MLP regression is supported. A two-score PyTorch output becomes
+the single margin `score[1] - score[0]`; three or more scores are centered.
+PyTorch inputs may have any single-tensor sample shape; Unified IG preserves
+the module's device, floating-point dtype, and prior training/evaluation state.
 
 ### Opt-in numerical fallback
 
@@ -289,10 +311,12 @@ explainer = uig.Explainer(
 )
 ```
 
-The fallback accepts fitted regressors with `predict` and binary classifiers
-with `decision_function`. It does not infer probability outputs. Work grows
-with the number of inputs, baselines, quadrature nodes, and features, so this
-route may be substantially slower than analytic or automatic gradients.
+The fallback accepts fitted regressors with `predict` and classifiers whose
+`decision_function` returns one binary margin or one score per multiclass
+label. It does not infer probability outputs. Pairwise-derived multiclass SVC
+scores are rejected. Work grows with the number of inputs, baselines,
+quadrature nodes, and features, so this route may be substantially slower than
+analytic or automatic gradients.
 
 Advanced numerical controls are available:
 
@@ -322,6 +346,27 @@ explanation.base_values + explanation.values.sum(over features)
 
 For regression, the explained output is the prediction. For binary
 classification, it is the positive-class decision score, logit, or raw margin.
+
+For a `K`-class model with raw scores `z`, Unified IG explains
+
+```text
+centered_scores = z - mean(z over classes)
+```
+
+The result stores `K` labeled outputs with only `K - 1` effective dimensions:
+
+```text
+explanation.values.shape = (samples, features, classes)
+sum(explanation.values over classes) = 0
+sum(explanation.base_values over classes) = 0
+```
+
+Completeness holds independently for every centered score. Pairwise margins
+are derived without recomputation:
+
+```python
+class_a_vs_b = explanation.contrast("class_a", "class_b")
+```
 
 | Field | Meaning |
 |---|---|
@@ -355,7 +400,7 @@ The intended first implementation provides:
 
 - a differentiable, batched JAX prediction function;
 - parameters supplied explicitly or captured in a closure;
-- one raw scalar output per sample;
+- one raw scalar or one raw score per class and sample;
 - native JAX automatic gradients;
 - Gauss–Legendre path integration;
 - shared baseline distributions and completeness diagnostics; and
@@ -373,14 +418,13 @@ that extra exists.
 ## Current gaps and deferred scope
 
 Notable remaining ecosystem gaps include JAX, TensorFlow/Keras, CatBoost, and
-sklearn classifiers whose natural outputs are probabilities or vote shares
-rather than additive decision scores. These
+classifiers whose natural outputs are probabilities or vote shares rather
+than additive decision scores. These
 need explicit output semantics or specialized path support rather than a silent
 finite-difference approximation.
 
 Also deferred:
 
-- multiclass output targeting;
 - exact piecewise-linear integration at ReLU activation boundaries;
 - multiple-input PyTorch models; and
 - a public third-party backend registry.
@@ -391,6 +435,7 @@ Complete examples are available for:
 
 - [linear regression](examples/linear_regression.py)
 - [binary logistic regression](examples/logistic_regression.py)
+- [multiclass classification](examples/multiclass_classification.py)
 - [sklearn MLP regression](examples/mlp_regression.py)
 - [sklearn MLP classification](examples/mlp_classification.py)
 - [PyTorch](examples/pytorch.py)
@@ -422,6 +467,7 @@ The stable public surface remains deliberately small:
 ```python
 uig.Explainer
 uig.Explanation
+uig.Explanation.contrast
 uig.Explanation.to_shap
 ```
 

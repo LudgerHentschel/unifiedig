@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 import skgrad
 
-from .base import BackendResult
+from .base import BackendResult, classification_score_result
 
 
 FloatArray = NDArray[np.floating]
@@ -25,9 +25,6 @@ class SkgradBackend:
         if not hasattr(model, "n_features_in_"):
             raise ValueError("model must be fitted before creating an Explainer")
 
-        classes = getattr(model, "classes_", None)
-        if classes is not None and len(classes) != 2:
-            raise ValueError("V1 supports only binary classifiers")
         if not isinstance(n_steps, int) or isinstance(n_steps, bool) or n_steps < 1:
             raise ValueError("n_steps must be a positive integer")
 
@@ -71,6 +68,15 @@ class SkgradBackend:
         ).copy()
         output_names = self._output_names(output_values.shape[1])
 
+        classes = getattr(self.model, "classes_", None)
+        if classes is not None and output_values.shape[1] >= 2:
+            return classification_score_result(
+                values,
+                base_values,
+                output_values,
+                [str(item) for item in classes],
+            )
+
         if output_values.shape[1] == 1:
             return BackendResult(
                 values[:, :, 0],
@@ -107,5 +113,7 @@ class SkgradBackend:
     def _output_names(self, n_outputs: int) -> Optional[Sequence[str]]:
         classes = getattr(self.model, "classes_", None)
         if classes is not None:
-            return [str(classes[1])]
+            if n_outputs == 1:
+                return [str(classes[1])]
+            return [str(item) for item in classes]
         return [str(index) for index in range(n_outputs)] if n_outputs > 1 else None

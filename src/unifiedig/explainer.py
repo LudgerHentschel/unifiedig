@@ -33,8 +33,9 @@ class Explainer:
     baseline row counts do not imply pairing. ``n_steps`` controls numerical
     backends and is ignored by exact backends.
 
-    Binary classifiers are explained on their decision-score (logit) scale in
-    V1. Probability attributions are intentionally not offered. Set
+    Classifiers are explained on their decision-score scale. Binary outputs use
+    one margin; multiclass outputs use the complete centered score vector.
+    Probability attributions are intentionally not offered. Set
     ``fallback="finite_difference"`` to explain an otherwise unsupported smooth
     sklearn estimator numerically; specialized backends always take precedence.
     """

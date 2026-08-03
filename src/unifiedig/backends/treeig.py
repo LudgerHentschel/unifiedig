@@ -5,7 +5,7 @@ from typing import Optional, Sequence
 import numpy as np
 from numpy.typing import NDArray
 
-from .base import BackendResult
+from .base import BackendResult, classification_score_result
 
 
 class TreeIGBackend:
@@ -65,11 +65,31 @@ class TreeIGBackend:
         if not treeig.supports(model):
             raise TypeError("TreeIGBackend received an unsupported model")
 
-        classes = getattr(model, "classes_", None)
-        if classes is not None and len(classes) != 2:
-            raise ValueError("V1 supports only binary tree classifiers")
         self.model = model
-        self._explainer = treeig.TreeIG(model)
+        classes = getattr(model, "classes_", None)
+        if classes is not None and len(classes) > 2:
+            self._explainer = treeig.TreeIG(model, target=0)
+            self._n_outputs = len(classes)
+            self._class_names = [str(item) for item in classes]
+        else:
+            try:
+                self._explainer = treeig.TreeIG(model)
+            except ValueError as original_error:
+                try:
+                    candidate = treeig.TreeIG(model, target=0)
+                except (TypeError, ValueError):
+                    raise original_error
+                arrays = getattr(candidate, "_arrays", {})
+                if arrays.get("output_kind") != "multiclass_margin":
+                    raise original_error
+                self._explainer = candidate
+                self._n_outputs = int(arrays["n_outputs"])
+                self._class_names = [
+                    str(index) for index in range(self._n_outputs)
+                ]
+            else:
+                self._n_outputs = 1
+                self._class_names = None
 
     def explain(
         self,
@@ -77,6 +97,43 @@ class TreeIGBackend:
         baseline: NDArray[np.floating],
         baseline_weights: NDArray[np.floating],
     ) -> BackendResult:
+        if self._n_outputs > 1:
+            values = np.stack(
+                [
+                    self._explainer.attribute(
+                        data,
+                        baseline=baseline,
+                        baseline_weights=baseline_weights,
+                        target=target,
+                    )
+                    for target in range(self._n_outputs)
+                ],
+                axis=-1,
+            )
+            output_values = np.column_stack(
+                [
+                    self._explainer.model_output(data, target=target)
+                    for target in range(self._n_outputs)
+                ]
+            )
+            baseline_outputs = np.column_stack(
+                [
+                    self._explainer.model_output(baseline, target=target)
+                    for target in range(self._n_outputs)
+                ]
+            )
+            mean_base_value = baseline_weights @ baseline_outputs
+            base_values = np.broadcast_to(
+                mean_base_value, (data.shape[0], self._n_outputs)
+            ).copy()
+            assert self._class_names is not None
+            return classification_score_result(
+                values,
+                base_values,
+                output_values,
+                self._class_names,
+            )
+
         values = self._explainer.attribute(
             data,
             baseline=baseline,

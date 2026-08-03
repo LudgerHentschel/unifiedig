@@ -117,12 +117,26 @@ def test_binary_gradient_boosting_uses_decision_scores():
     )
 
 
-def test_multiclass_tree_classifier_is_rejected():
+def test_multiclass_tree_classifier_uses_centered_scores():
     from sklearn.ensemble import GradientBoostingClassifier
 
     X, score = _regression_data(seed=3)
     y = np.digitize(score, np.quantile(score, [1 / 3, 2 / 3]))
     model = GradientBoostingClassifier(random_state=3).fit(X, y)
+    data = X[20:26]
+    baselines = X[:3]
+    weights = np.array([0.1, 0.2, 0.7])
 
-    with pytest.raises(ValueError, match="only binary tree classifiers"):
-        uig.Explainer(model, X[0])
+    explanation = uig.Explainer(
+        model, baselines, baseline_weights=weights
+    )(data)
+
+    scores = model.decision_function(data)
+    centered_scores = scores - scores.mean(axis=1, keepdims=True)
+    assert explanation.values.shape == (6, X.shape[1], 3)
+    np.testing.assert_allclose(explanation.values.sum(axis=-1), 0.0, atol=1e-12)
+    np.testing.assert_allclose(
+        explanation.values.sum(axis=1) + explanation.base_values,
+        centered_scores,
+        atol=1e-10,
+    )

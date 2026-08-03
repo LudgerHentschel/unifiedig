@@ -12,6 +12,9 @@
 - Support explicit weighted baseline distributions across every backend and
   consume CBaseline `Background` objects directly through their public
   `rows` and `weights` properties.
+- Attribute multiclass models as one centered, zero-sum decision-score vector
+  across skgrad, TreeIG, PyTorch, and numerical backends.
+- Add `Explanation.contrast()` for derived pairwise score-margin attribution.
 - Expand the README with computation routes, model coverage, baseline guidance,
   SHAP plotting, numerical diagnostics, and the planned JAX scope.
 

@@ -20,11 +20,18 @@ def test_binary_logistic_regression_is_complete_on_logit_scale():
     assert result.output_names == [str(model.classes_[1])]
 
 
-def test_multiclass_logistic_regression_is_rejected():
+def test_multiclass_logistic_regression_contrast_recovers_pairwise_margin():
     model = LogisticRegression().fit(
         np.array([[-2.0], [-1.0], [0.0], [1.0], [2.0], [3.0]]),
         np.array([0, 0, 1, 1, 2, 2]),
     )
-    with pytest.raises(ValueError, match="binary"):
-        uig.Explainer(model, np.array([0.0]))
+    data = np.array([[-0.5], [1.5], [2.5]])
+    result = uig.Explainer(model, np.array([0.0]))(data)
 
+    contrast = result.contrast("2", "0")
+    raw_scores = model.decision_function(data)
+    np.testing.assert_allclose(
+        contrast.values.sum(axis=1) + contrast.base_values,
+        raw_scores[:, 2] - raw_scores[:, 0],
+    )
+    assert contrast.output_names == ["2 - 0"]

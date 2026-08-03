@@ -1,6 +1,7 @@
 """A small, plotting-library-independent explanation container."""
 
 from dataclasses import dataclass
+from numbers import Integral
 from typing import Any, Optional, Sequence
 
 import numpy as np
@@ -44,6 +45,14 @@ class Explanation:
         )
         if base_values.shape != expected_base_shape:
             raise ValueError(f"base_values must have shape {expected_base_shape}")
+        if self.output_names is not None:
+            output_names = [str(name) for name in self.output_names]
+            object.__setattr__(self, "output_names", output_names)
+            expected_outputs = 1 if scalar_output else values.shape[-1]
+            if len(output_names) != expected_outputs:
+                raise ValueError(
+                    f"output_names must contain {expected_outputs} names"
+                )
         if self.completeness_error is not None:
             completeness_error = np.asarray(self.completeness_error)
             object.__setattr__(self, "completeness_error", completeness_error)
@@ -62,6 +71,67 @@ class Explanation:
         if self.completeness_error is None:
             return None
         return float(np.max(np.abs(self.completeness_error)))
+
+    def contrast(self, first: Any, second: Any) -> "Explanation":
+        """Return the scalar decision-score contrast ``first - second``.
+
+        Multiclass explanations store centered class scores. Subtracting two
+        coordinates recovers the invariant pairwise raw-score margin without
+        evaluating the model or recomputing Integrated Gradients.
+        """
+
+        if self.values.ndim != self.data.ndim + 1:
+            raise ValueError("contrast requires a multi-output explanation")
+        first_index = self._output_index(first)
+        second_index = self._output_index(second)
+        if first_index == second_index:
+            raise ValueError("contrast outputs must be different")
+        error = None
+        if self.completeness_error is not None:
+            error = (
+                self.completeness_error[..., first_index]
+                - self.completeness_error[..., second_index]
+            )
+        first_name = self._output_name(first_index)
+        second_name = self._output_name(second_index)
+        return Explanation(
+            values=(
+                self.values[..., first_index] - self.values[..., second_index]
+            ),
+            base_values=(
+                self.base_values[..., first_index]
+                - self.base_values[..., second_index]
+            ),
+            data=self.data,
+            feature_names=self.feature_names,
+            output_names=[f"{first_name} - {second_name}"],
+            completeness_error=error,
+        )
+
+    def _output_index(self, output: Any) -> int:
+        n_outputs = self.values.shape[-1]
+        if isinstance(output, Integral) and not isinstance(output, bool):
+            index = int(output)
+            if index < 0 or index >= n_outputs:
+                raise IndexError(f"output index must be in [0, {n_outputs - 1}]")
+            return index
+        if isinstance(output, str):
+            if self.output_names is None:
+                raise ValueError("named contrasts require output_names")
+            matches = [
+                index
+                for index, name in enumerate(self.output_names)
+                if name == output
+            ]
+            if len(matches) != 1:
+                raise ValueError(f"unknown or ambiguous output name: {output!r}")
+            return matches[0]
+        raise TypeError("contrast outputs must be integer indices or names")
+
+    def _output_name(self, index: int) -> str:
+        if self.output_names is None:
+            return str(index)
+        return self.output_names[index]
 
     def to_shap(self) -> Any:
         """Return an equivalent ``shap.Explanation`` when SHAP is installed."""

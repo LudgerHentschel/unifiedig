@@ -3,23 +3,17 @@
 ## Current development line — 0.1.1.dev0
 
 - Delegate smooth sklearn model support and analytic input Jacobians to skgrad.
-- Recognize affine regression and binary score-classification models through
-  skgrad's unified support API.
+- Recognize affine regression and binary or multiclass score-classification
+  models through skgrad's unified support API.
 - Preserve a constant-Jacobian fast path for exact affine attribution.
 - Provide an opt-in, batched finite-difference fallback for other smooth
   sklearn estimators.
 - Support weighted baseline distributions and CBaseline `Background` objects
   uniformly across all backends.
+- Attribute multiclass classifiers as one centered decision-score vector with
+  `K - 1` effective dimensions and provide derived pairwise contrasts.
 - Document the complete model inventory, output semantics, baseline behavior,
   numerical diagnostics, and SHAP plotting adapter.
-
-## Next attribution capability — multiclass scores
-
-Treat multiclass classification as attribution of one centered decision-score
-vector with `K - 1` effective dimensions, represented by `K` labeled,
-zero-sum score coordinates. Add multi-output completeness and pairwise score
-contrasts without offering probability attribution or independent
-target-class explanations.
 
 ## Next model backend — JAX
 
@@ -39,7 +33,6 @@ classes.
 
 ## Before the next published release
 
-- Stabilize the centered-score multiclass shape and completeness contract.
 - Stabilize the JAX constructor and optional dependency extra.
 - Add a JAX example and dedicated GitHub Actions job.
 - Run source-tree and installed-wheel tests for all optional backends.

@@ -156,13 +156,35 @@ def test_completeness_warning_can_be_disabled():
     assert result.max_abs_completeness_error == pytest.approx(0.5)
 
 
-def test_multiclass_mlp_classifier_is_rejected():
-    model = MLPClassifier(hidden_layer_sizes=(2,), solver="lbfgs", random_state=0).fit(
+def test_multiclass_mlp_classifier_uses_centered_logits():
+    model = MLPClassifier(
+        hidden_layer_sizes=(2,), activation="tanh", solver="lbfgs", random_state=0
+    ).fit(
         np.array([[-2.0], [-1.0], [0.0], [1.0], [2.0], [3.0]]),
         np.array([0, 0, 1, 1, 2, 2]),
     )
-    with pytest.raises(ValueError, match="binary"):
-        uig.Explainer(model, [0.0])
+    model.coefs_ = [
+        np.array([[0.7, -0.4]]),
+        np.array([[0.6, -0.3, 0.2], [-0.5, 0.4, 0.1]]),
+    ]
+    model.intercepts_ = [np.array([0.1, -0.2]), np.array([0.2, -0.1, 0.3])]
+    data = np.array([[-0.5], [0.5], [1.5]])
+    baselines = np.array([[-1.0], [0.0], [1.0]])
+    weights = np.array([0.2, 0.3, 0.5])
+
+    result = uig.Explainer(
+        model, baselines, baseline_weights=weights
+    )(data)
+
+    hidden = np.tanh(data @ model.coefs_[0] + model.intercepts_[0])
+    logits = hidden @ model.coefs_[1] + model.intercepts_[1]
+    centered = logits - logits.mean(axis=1, keepdims=True)
+    np.testing.assert_allclose(result.values.sum(axis=-1), 0.0, atol=1e-12)
+    np.testing.assert_allclose(
+        result.values.sum(axis=1) + result.base_values,
+        centered,
+        atol=1e-8,
+    )
 
 
 @pytest.mark.parametrize("n_steps", [0, -1, 1.5, True])

@@ -144,3 +144,48 @@ def test_explanation_normalizes_array_like_fields():
             base_values=np.zeros(2),
             data=np.zeros((2, 2)),
         )
+
+
+def test_multiclass_contrast_validation():
+    explanation = uig.Explanation(
+        values=np.zeros((2, 3, 3)),
+        base_values=np.zeros((2, 3)),
+        data=np.zeros((2, 3)),
+        output_names=["a", "b", "c"],
+    )
+
+    assert explanation.contrast(2, 0).output_names == ["c - a"]
+    with pytest.raises(ValueError, match="different"):
+        explanation.contrast("a", "a")
+    with pytest.raises(ValueError, match="unknown"):
+        explanation.contrast("missing", "a")
+    with pytest.raises(IndexError, match="output index"):
+        explanation.contrast(3, 0)
+    with pytest.raises(TypeError, match="integer indices or names"):
+        explanation.contrast(1.5, 0)
+
+
+def test_output_names_must_align_with_output_axis():
+    with pytest.raises(ValueError, match="output_names"):
+        uig.Explanation(
+            values=np.zeros((2, 3, 3)),
+            base_values=np.zeros((2, 3)),
+            data=np.zeros((2, 3)),
+            output_names=["a", "b"],
+        )
+
+
+def test_multiclass_to_shap_preserves_output_axis():
+    shap = pytest.importorskip("shap")
+    explanation = uig.Explanation(
+        values=np.zeros((2, 3, 3)),
+        base_values=np.zeros((2, 3)),
+        data=np.zeros((2, 3)),
+        output_names=["a", "b", "c"],
+    )
+
+    converted = explanation.to_shap()
+
+    assert isinstance(converted, shap.Explanation)
+    assert converted.values.shape == (2, 3, 3)
+    assert converted.output_names == ["a", "b", "c"]

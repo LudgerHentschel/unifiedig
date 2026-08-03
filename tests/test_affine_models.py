@@ -61,13 +61,29 @@ def test_affine_classifiers_use_binary_decision_scores(model):
     np.testing.assert_allclose(explanation.completeness_error, 0.0, atol=1e-12)
 
 
-def test_multiclass_ridge_classifier_is_rejected():
+def test_multiclass_ridge_classifier_uses_centered_scores():
     training, score = _data()
     target = np.digitize(score, np.quantile(score, [1 / 3, 2 / 3]))
     model = RidgeClassifier().fit(training, target)
+    data = training[:6]
+    baselines = training[10:14]
+    weights = np.array([0.1, 0.2, 0.3, 0.4])
 
-    with pytest.raises(ValueError, match="binary classifiers"):
-        uig.Explainer(model, training[0])
+    explanation = uig.Explainer(
+        model, baselines, baseline_weights=weights
+    )(data)
+
+    scores = model.decision_function(data)
+    centered_scores = scores - scores.mean(axis=1, keepdims=True)
+    assert explanation.values.shape == (6, training.shape[1], 3)
+    assert explanation.output_names == [str(item) for item in model.classes_]
+    np.testing.assert_allclose(explanation.values.sum(axis=-1), 0.0, atol=1e-12)
+    np.testing.assert_allclose(explanation.base_values.sum(axis=-1), 0.0, atol=1e-12)
+    np.testing.assert_allclose(
+        explanation.values.sum(axis=1) + explanation.base_values,
+        centered_scores,
+        atol=1e-12,
+    )
 
 
 def test_constant_jacobian_fast_path_ignores_quadrature_count(monkeypatch):

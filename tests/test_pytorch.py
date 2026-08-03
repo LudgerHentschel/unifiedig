@@ -118,10 +118,44 @@ def test_model_module_training_states_are_restored():
     assert [module.training for module in model.modules()] == states_before
 
 
-def test_multi_output_torch_model_is_rejected():
-    model = torch.nn.Linear(2, 3)
-    with pytest.raises(ValueError, match="one raw scalar output"):
-        uig.Explainer(model, [0.0, 0.0])([[1.0, 2.0]])
+def test_multiclass_torch_model_uses_centered_scores():
+    model = torch.nn.Linear(2, 3, bias=True).double()
+    data = torch.tensor([[1.0, 2.0], [-0.5, 0.7]], dtype=torch.float64)
+    baselines = torch.tensor(
+        [[0.0, 0.0], [0.2, -0.1]], dtype=torch.float64
+    )
+    weights = np.array([0.25, 0.75])
+
+    result = uig.Explainer(
+        model, baselines, baseline_weights=weights
+    )(data)
+
+    raw_scores = model(data).detach().numpy()
+    centered_scores = raw_scores - raw_scores.mean(axis=1, keepdims=True)
+    assert result.values.shape == (2, 2, 3)
+    np.testing.assert_allclose(result.values.sum(axis=-1), 0.0, atol=1e-12)
+    np.testing.assert_allclose(result.base_values.sum(axis=-1), 0.0, atol=1e-12)
+    np.testing.assert_allclose(
+        result.values.sum(axis=1) + result.base_values,
+        centered_scores,
+        atol=1e-8,
+    )
+
+
+def test_two_score_torch_model_becomes_one_binary_margin():
+    model = torch.nn.Linear(2, 2, bias=True).double()
+    data = torch.tensor([[1.0, 2.0], [-0.5, 0.7]], dtype=torch.float64)
+
+    result = uig.Explainer(model, [0.0, 0.0])(data)
+
+    raw_scores = model(data).detach().numpy()
+    assert result.values.shape == (2, 2)
+    assert result.output_names == ["1"]
+    np.testing.assert_allclose(
+        result.values.sum(axis=1) + result.base_values,
+        raw_scores[:, 1] - raw_scores[:, 0],
+        atol=1e-8,
+    )
 
 
 def test_missing_captum_error_is_actionable(monkeypatch):
