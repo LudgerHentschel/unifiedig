@@ -13,6 +13,7 @@ from .backends import (
     PyTorchBackend,
     SkgradBackend,
     TreeIGBackend,
+    TreeIGNumericBackend,
 )
 from .baselines import normalize_inputs, normalize_jax_inputs, normalize_torch_inputs
 from .explanation import Explanation
@@ -39,7 +40,9 @@ class Explainer:
     one margin; multiclass outputs use the complete centered score vector.
     Probability attributions are intentionally not offered. Set
     ``fallback="finite_difference"`` to explain an otherwise unsupported smooth
-    sklearn estimator numerically; specialized backends always take precedence.
+    sklearn estimator numerically, or ``fallback="tree_numeric"`` to use
+    approximate path-event detection for a recognized piecewise-constant tree
+    model. Specialized backends always take precedence.
     Differentiable JAX functions are selected explicitly by wrapping them in
     :class:`unifiedig.JaxModel`.
     """
@@ -57,13 +60,16 @@ class Explainer:
         fallback: Optional[str] = None,
         finite_difference_step: float = 1e-5,
         finite_difference_batch_size: int = 8192,
+        tree_grid_size: int = 1024,
     ) -> None:
         if not isinstance(n_steps, int) or isinstance(n_steps, bool) or n_steps < 1:
             raise ValueError("n_steps must be a positive integer")
         if not isinstance(check_completeness, bool):
             raise ValueError("check_completeness must be a boolean")
-        if fallback not in (None, "finite_difference"):
-            raise ValueError("fallback must be None or 'finite_difference'")
+        if fallback not in (None, "finite_difference", "tree_numeric"):
+            raise ValueError(
+                "fallback must be None, 'finite_difference', or 'tree_numeric'"
+            )
         if (
             not isinstance(finite_difference_step, Real)
             or isinstance(finite_difference_step, bool)
@@ -76,6 +82,12 @@ class Explainer:
             or finite_difference_batch_size < 1
         ):
             raise ValueError("finite_difference_batch_size must be a positive integer")
+        if (
+            not isinstance(tree_grid_size, int)
+            or isinstance(tree_grid_size, bool)
+            or tree_grid_size < 1
+        ):
+            raise ValueError("tree_grid_size must be a positive integer")
         self.model = model
         self.baseline = baseline
         self.baseline_weights = baseline_weights
@@ -92,20 +104,33 @@ class Explainer:
             if fallback is None:
                 raise TypeError(
                     f"no Unified IG backend supports {type(model).__name__}; "
-                    "set fallback='finite_difference' for a smooth sklearn estimator"
+                    "set fallback='finite_difference' for a smooth sklearn "
+                    "estimator or fallback='tree_numeric' for a supported "
+                    "piecewise-constant tree model"
                 )
-            self._backend = FiniteDifferenceBackend(
-                model,
-                n_steps=n_steps,
-                relative_step=float(finite_difference_step),
-                batch_size=finite_difference_batch_size,
-            )
-            warnings.warn(
-                "Using finite-difference gradients; attribution may be substantially "
-                "slower than a specialized backend.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
+            if fallback == "tree_numeric":
+                self._backend = TreeIGNumericBackend(
+                    model, n_steps=tree_grid_size
+                )
+                warnings.warn(
+                    "Using numerical tree path-event detection; feature allocations "
+                    "are approximate and depend on detecting all path crossings.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+            else:
+                self._backend = FiniteDifferenceBackend(
+                    model,
+                    n_steps=n_steps,
+                    relative_step=float(finite_difference_step),
+                    batch_size=finite_difference_batch_size,
+                )
+                warnings.warn(
+                    "Using finite-difference gradients; attribution may be substantially "
+                    "slower than a specialized backend.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
         else:
             self._backend = backend_type(model, n_steps=n_steps)
 

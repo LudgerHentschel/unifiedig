@@ -55,6 +55,8 @@ The same public API currently covers:
 - sklearn multilayer perceptrons;
 - supported sklearn decision trees and ensembles;
 - XGBoost and LightGBM models supported by TreeIG;
+- numeric-input CatBoost and other recognized piecewise-constant tree models
+  through explicit numerical path-event detection;
 - scalar-output and class-score PyTorch modules;
 - differentiable JAX prediction functions, including functions backed by
   Flax, NNX, Equinox, or Haiku models; and
@@ -102,6 +104,7 @@ Optional capabilities are installed separately:
 | Capability | Installation |
 |---|---|
 | Exact sklearn, XGBoost, and LightGBM tree attribution | `pip install "unifiedig[trees]"` |
+| Numerical CatBoost attribution | `pip install "unifiedig[catboost]"` |
 | PyTorch attribution through Captum | `pip install "unifiedig[torch]"` |
 | JAX automatic-gradient attribution | `pip install "unifiedig[jax]"` |
 | Conversion to `shap.Explanation` | `pip install "unifiedig[shap]"` |
@@ -138,6 +141,7 @@ Unified IG automatically selects the strongest available route:
 | Differentiable sklearn | Analytic Jacobians from skgrad | Gauss–Legendre quadrature | sklearn MLPs |
 | PyTorch | Automatic gradients through Captum | Gauss–Legendre quadrature | Scalar-output and class-score `torch.nn.Module` models |
 | JAX | Native automatic gradients | Gauss–Legendre quadrature | Differentiable scalar-output and class-score prediction functions |
+| Numerical trees | TreeIG path-event detection | Approximate crossing search | CatBoost and recognized unsupported piecewise-constant trees |
 | Numerical fallback | Batched central finite differences | Gauss–Legendre quadrature | Other smooth sklearn estimators |
 
 Specialized routes always take precedence over the fallback. Users get exact
@@ -283,6 +287,35 @@ Exact affine and tree routes ignore `n_steps`.
 Tree support is delegated to TreeIG. TreeIG's requirements and exclusions—such
 as finite numeric inputs and numeric splits—also apply through Unified IG.
 
+### Numerical tree path detection
+
+For a recognized piecewise-constant tree model without an exact TreeIG parser,
+request TreeIG's numerical event detector explicitly:
+
+```python
+explainer = uig.Explainer(
+    model,
+    background,
+    fallback="tree_numeric",
+    tree_grid_size=256,
+)
+```
+
+This route scans each baseline-to-input path for output jumps and locally
+probes detected events to identify responsible features. It supports weighted
+background distributions and preserves Unified IG's binary-margin and
+centered-multiclass score semantics. CatBoost uses `RawFormulaVal`, not
+probabilities. Native categorical inputs are excluded because straight-line
+interpolation between category codes is not meaningful; numeric and externally
+encoded inputs are supported.
+
+Unlike structural TreeIG, event detection is approximate. `tree_grid_size`
+sets the number of scanned path intervals and defaults to 1,024. Unified IG's
+completeness diagnostic reveals missed endpoint changes, although merged
+crossings can still affect feature allocation without producing a residual.
+Exact structural backends always take precedence even when this fallback is
+requested.
+
 ### Fast gradients with numerical integration
 
 | Ecosystem | Supported models | Explained output |
@@ -412,7 +445,8 @@ model is smooth or that every individual attribution is accurate.
 
 ## Current gaps and deferred scope
 
-Notable remaining ecosystem gaps include TensorFlow/Keras, CatBoost, and
+Notable remaining ecosystem gaps include TensorFlow/Keras, exact structural
+CatBoost attribution, and
 classifiers whose natural outputs are probabilities or vote shares rather
 than additive decision scores. These need explicit output semantics or
 specialized path support rather than a silent finite-difference approximation.
@@ -435,6 +469,7 @@ Complete examples are available for:
 - [PyTorch](examples/pytorch.py)
 - [JAX](examples/jax_model.py)
 - [the numerical fallback](examples/numerical_fallback.py)
+- [numerical tree path detection](examples/numerical_tree.py)
 
 ## Development
 

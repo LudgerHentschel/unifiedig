@@ -26,8 +26,9 @@ dependencies = ["numpy>=1.23", "scikit-learn>=1.2", "skgrad>=0.1.1"]
 shap = ["shap>=0.42"]
 torch = ["captum>=0.7", "torch>=2.0"]
 jax = ["jax>=0.4"]
-trees = ["treeig>=0.1.8"]
-all = ["captum>=0.7", "jax>=0.4", "shap>=0.42", "torch>=2.0", "treeig>=0.1.8"]
+trees = ["treeig>=0.1.9"]
+catboost = ["catboost>=1.2", "treeig>=0.1.9"]
+all = ["captum>=0.7", "catboost>=1.2", "jax>=0.4", "shap>=0.42", "torch>=2.0", "treeig>=0.1.9"]
 test = [
     "build>=1",
     "matplotlib>=3.6",

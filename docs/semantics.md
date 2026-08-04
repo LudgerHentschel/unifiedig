@@ -100,6 +100,11 @@ their completeness tests use an explicit numerical tolerance.
 
 Supported tree models are delegated to TreeIG, which computes their path
 attributions exactly and applies the same shared-distribution semantics.
+When explicitly selected with `fallback="tree_numeric"`, TreeIGNumeric instead
+searches for discontinuities on a finite path grid. Detected jumps are
+allocated locally and averaged over the same weighted baseline distribution.
+This route is complete when it recovers all endpoint changes, but its feature
+allocation remains approximate when crossings are missed or merged.
 
 `Explanation.completeness_error` stores the signed residual between the model
 output and the reconstructed output. `max_abs_completeness_error` summarizes
@@ -135,3 +140,7 @@ local finite-difference gradients do not represent path discontinuities
 reliably. A small completeness residual is an important numerical diagnostic,
 but it is not a general proof that a model is smooth or that every individual
 attribution is accurate.
+
+The separate numerical-tree control `tree_grid_size` defaults to 1,024 path
+intervals. Increasing it improves the chance of separating nearby tree
+crossings but increases model evaluations proportionally.

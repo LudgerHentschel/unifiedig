@@ -19,6 +19,9 @@
   `JaxModel` adapter, including parameter pytrees, closures, single-sample
   vectorization, weighted backgrounds, and centered multiclass scores.
 - Add a JAX example, optional dependency extra, and dedicated CI job.
+- Add an explicit `fallback="tree_numeric"` route for CatBoost and recognized
+  piecewise-constant tree models through TreeIGNumeric, with weighted
+  backgrounds, multiclass raw scores, configurable path grids, and CatBoost CI.
 - Expand the README with computation routes, model coverage, baseline guidance,
   SHAP plotting, numerical diagnostics, and JAX usage.
 
