@@ -42,7 +42,9 @@ class Explainer:
     ``fallback="finite_difference"`` to explain an otherwise unsupported smooth
     sklearn estimator numerically, or ``fallback="tree_numeric"`` to use
     approximate path-event detection for a recognized piecewise-constant tree
-    model. Specialized backends always take precedence.
+    model. Probability-only tree classifiers are transformed to log scores;
+    ``probability_floor`` must be set explicitly if any path probability is
+    zero. Specialized backends always take precedence.
     Differentiable JAX functions are selected explicitly by wrapping them in
     :class:`unifiedig.JaxModel`.
     """
@@ -61,6 +63,7 @@ class Explainer:
         finite_difference_step: float = 1e-5,
         finite_difference_batch_size: int = 8192,
         tree_grid_size: int = 1024,
+        probability_floor: Optional[float] = None,
     ) -> None:
         if not isinstance(n_steps, int) or isinstance(n_steps, bool) or n_steps < 1:
             raise ValueError("n_steps must be a positive integer")
@@ -88,6 +91,14 @@ class Explainer:
             or tree_grid_size < 1
         ):
             raise ValueError("tree_grid_size must be a positive integer")
+        if probability_floor is not None and (
+            not isinstance(probability_floor, Real)
+            or isinstance(probability_floor, bool)
+            or not 0.0 < probability_floor < 1.0
+        ):
+            raise ValueError(
+                "probability_floor must be strictly between 0 and 1"
+            )
         self.model = model
         self.baseline = baseline
         self.baseline_weights = baseline_weights
@@ -110,7 +121,13 @@ class Explainer:
                 )
             if fallback == "tree_numeric":
                 self._backend = TreeIGNumericBackend(
-                    model, n_steps=tree_grid_size
+                    model,
+                    n_steps=tree_grid_size,
+                    probability_floor=(
+                        None
+                        if probability_floor is None
+                        else float(probability_floor)
+                    ),
                 )
                 warnings.warn(
                     "Using numerical tree path-event detection; feature allocations "

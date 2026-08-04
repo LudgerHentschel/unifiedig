@@ -15,6 +15,8 @@
 - Expose TreeIGNumeric as an explicit approximate fallback for CatBoost and
   recognized piecewise-constant tree models, including weighted backgrounds
   and centered multiclass raw scores.
+- Explain probability-only sklearn tree classifiers as binary log odds or
+  centered multiclass log scores, with an explicit zero-probability floor.
 - Document the complete model inventory, output semantics, baseline behavior,
   numerical diagnostics, and SHAP plotting adapter.
 
@@ -42,8 +44,8 @@ lightweight public `JaxModel` adapter rather than separate explainer classes.
 ## Deferred work
 
 - TensorFlow/Keras support.
-- Exact structural CatBoost and sklearn histogram-gradient-boosting support.
-- Explicit probability-to-score semantics for probability-only classifiers.
+- Exact structural CatBoost, probability-averaging forest, and sklearn
+  histogram-gradient-boosting support.
 - Exact piecewise-linear IG for ReLU networks by detecting activation-region
   transitions along the baseline path.
 - Further batching and memory optimization for large smooth models.

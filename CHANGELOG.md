@@ -22,6 +22,9 @@
 - Add an explicit `fallback="tree_numeric"` route for CatBoost and recognized
   piecewise-constant tree models through TreeIGNumeric, with weighted
   backgrounds, multiclass raw scores, configurable path grids, and CatBoost CI.
+- Support probability-only decision-tree and forest classifiers through
+  explicit binary-log-odds or centered-multiclass-log-score transformation,
+  with no silent handling of zero probabilities.
 - Expand the README with computation routes, model coverage, baseline guidance,
   SHAP plotting, numerical diagnostics, and JAX usage.
 

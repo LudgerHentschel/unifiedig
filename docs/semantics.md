@@ -106,6 +106,26 @@ allocated locally and averaged over the same weighted baseline distribution.
 This route is complete when it recovers all endpoint changes, but its feature
 allocation remains approximate when crossings are missed or merged.
 
+For a classifier with probabilities but no native decision score, the
+numerical-tree route explains derived scores. With class probabilities `p`,
+binary classification uses
+
+```text
+score = log(p_1) - log(p_0),
+```
+
+and multiclass classification uses
+
+```text
+score_k = log(p_k) - mean(log(p) over classes).
+```
+
+The multiclass object is therefore centered and pairwise contrasts are log
+odds. Because tree probabilities may be exactly zero, Unified IG raises when
+the logarithm is not finite unless `probability_floor` was supplied explicitly.
+When supplied, each probability is floored and the vector is renormalized;
+completeness refers to that explicitly smoothed score function.
+
 `Explanation.completeness_error` stores the signed residual between the model
 output and the reconstructed output. `max_abs_completeness_error` summarizes
 the worst sample/output. Numerical backends emit a `RuntimeWarning` when this

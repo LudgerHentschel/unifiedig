@@ -1,5 +1,6 @@
 """Explicit numerical path-event fallback powered by TreeIGNumeric."""
 
+import warnings
 from typing import Optional, Sequence
 
 import numpy as np
@@ -41,12 +42,18 @@ class TreeIGNumericBackend:
             ),
         )
 
-    def __init__(self, model: object, *, n_steps: int = 1024) -> None:
+    def __init__(
+        self,
+        model: object,
+        *,
+        n_steps: int = 1024,
+        probability_floor: Optional[float] = None,
+    ) -> None:
         try:
             import treeig
         except ImportError as exc:
             raise ImportError(
-                "Numerical tree support requires TreeIG 0.1.9 or newer. "
+                "Numerical tree support requires TreeIG 0.1.10 or newer. "
                 "Install it with `pip install unifiedig[trees]`."
             ) from exc
         if not self.supports(model):
@@ -56,14 +63,20 @@ class TreeIGNumericBackend:
             )
         classes = getattr(model, "classes_", None)
         self._classes = None if classes is None else list(classes)
-        if self._classes and not self._has_raw_score_output(model):
-            raise TypeError(
-                f"{type(model).__name__} exposes class probabilities but no raw "
-                "decision score; probability-to-score attribution is not yet "
-                "enabled"
+        self._probability_to_score = bool(
+            self._classes and not self._has_raw_score_output(model)
+        )
+        if self._probability_to_score:
+            warnings.warn(
+                f"{type(model).__name__} has no native decision score; deriving "
+                "binary log odds or centered multiclass log scores from its "
+                "class probabilities.",
+                RuntimeWarning,
+                stacklevel=3,
             )
         self.model = model
         self.grid_size = n_steps
+        self.probability_floor = probability_floor
         self._treeig = treeig
 
     def explain(
@@ -110,13 +123,25 @@ class TreeIGNumericBackend:
         mean_base = 0.0
         output_values = None
         for baseline_row, weight in zip(baseline, baseline_weights):
-            explainer = self._treeig.TreeIGNumeric(
-                self.model,
-                baseline=baseline_row,
-                target=target,
-                grid_size=self.grid_size,
-                warn_residual=False,
-            )
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="No native decision score is available.*",
+                    category=RuntimeWarning,
+                )
+                explainer = self._treeig.TreeIGNumeric(
+                    self.model,
+                    baseline=baseline_row,
+                    target=target,
+                    probability_to_score=self._probability_to_score,
+                    probability_floor=(
+                        self.probability_floor
+                        if self._probability_to_score
+                        else None
+                    ),
+                    grid_size=self.grid_size,
+                    warn_residual=False,
+                )
             values += float(weight) * explainer.attribute(data)
             mean_base += float(weight) * explainer.model_output(
                 baseline_row[None, :]

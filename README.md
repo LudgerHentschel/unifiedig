@@ -54,6 +54,8 @@ The same public API currently covers:
 - binary and multiclass linear classifiers on their decision-score scale;
 - sklearn multilayer perceptrons;
 - supported sklearn decision trees and ensembles;
+- probability-only decision-tree, random-forest, and extra-trees classifiers
+  through explicit probability-derived score attribution;
 - XGBoost and LightGBM models supported by TreeIG;
 - numeric-input CatBoost and other recognized piecewise-constant tree models
   through explicit numerical path-event detection;
@@ -298,6 +300,7 @@ explainer = uig.Explainer(
     background,
     fallback="tree_numeric",
     tree_grid_size=256,
+    probability_floor=1e-6,  # needed only if class probabilities can reach zero
 )
 ```
 
@@ -315,6 +318,20 @@ completeness diagnostic reveals missed endpoint changes, although merged
 crossings can still affect feature allocation without producing a residual.
 Exact structural backends always take precedence even when this fallback is
 requested.
+
+For `DecisionTreeClassifier`, `RandomForestClassifier`, and
+`ExtraTreesClassifier`, which expose probabilities but no native score,
+Unified IG transforms the complete model probability vector. Binary models use
+`log(p1) - log(p0)`. Multiclass models use
+`log(p_k) - mean(log(p))`, retaining all `K` centered coordinates. This is a
+transformation of the forest probability after aggregation, not a sum of
+separately transformed tree outputs.
+
+Tree probabilities can be exactly zero. Unified IG never clips them silently:
+if any evaluated path point has zero probability, attribution raises unless
+the user supplies `probability_floor`. The floor is applied to every class and
+the vector is renormalized before taking logarithms. Consequently, choosing a
+floor explicitly defines the finite score object being explained.
 
 ### Fast gradients with numerical integration
 
@@ -445,11 +462,10 @@ model is smooth or that every individual attribution is accurate.
 
 ## Current gaps and deferred scope
 
-Notable remaining ecosystem gaps include TensorFlow/Keras, exact structural
-CatBoost attribution, and
-classifiers whose natural outputs are probabilities or vote shares rather
-than additive decision scores. These need explicit output semantics or
-specialized path support rather than a silent finite-difference approximation.
+Notable remaining ecosystem gaps include TensorFlow/Keras and exact structural
+support for CatBoost and probability-averaging sklearn forests. The latter are
+already covered by explicit numerical path-event detection, but their feature
+allocation remains approximate.
 
 Also deferred:
 
@@ -470,6 +486,7 @@ Complete examples are available for:
 - [JAX](examples/jax_model.py)
 - [the numerical fallback](examples/numerical_fallback.py)
 - [numerical tree path detection](examples/numerical_tree.py)
+- [probability-only random forest classification](examples/probability_forest.py)
 
 ## Development
 
