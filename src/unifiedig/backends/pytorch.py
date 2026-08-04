@@ -1,6 +1,6 @@
 """Optional Captum-backed Integrated Gradients for PyTorch modules."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 import numpy as np
 
@@ -8,7 +8,7 @@ from .base import BackendResult, classification_score_result
 
 
 class PyTorchBackend:
-    """Explain raw scalar or class-score PyTorch outputs with Captum."""
+    """Explain scalar or vector PyTorch outputs with Captum."""
 
     input_kind = "torch"
 
@@ -20,7 +20,13 @@ class PyTorchBackend:
             return False
         return isinstance(model, torch.nn.Module)
 
-    def __init__(self, model: object, *, n_steps: int = 64) -> None:
+    def __init__(
+        self,
+        model: object,
+        *,
+        n_steps: int = 64,
+        output_kind: Literal["auto", "regression", "classification"] = "auto",
+    ) -> None:
         try:
             import torch
             from captum.attr import IntegratedGradients
@@ -37,6 +43,7 @@ class PyTorchBackend:
         reference = next((tensor for tensor in tensors if tensor.is_floating_point()), None)
         self.device = reference.device if reference is not None else None
         self.dtype = reference.dtype if reference is not None else None
+        self.output_kind = output_kind
         self._integrated_gradients = IntegratedGradients(self._forward)
 
     def explain(
@@ -77,14 +84,19 @@ class PyTorchBackend:
         values_array = self._to_numpy(attributions)
         base_array = self._to_numpy(base_values)
         output_array = self._to_numpy(output_values)
-        if n_outputs >= 2:
+        if n_outputs >= 2 and self.output_kind != "regression":
             return classification_score_result(
                 values_array,
                 base_array,
                 output_array,
                 [str(index) for index in range(n_outputs)],
             )
-        return BackendResult(values_array, base_array, output_array, None)
+        output_names = (
+            [str(index) for index in range(n_outputs)]
+            if n_outputs >= 2
+            else None
+        )
+        return BackendResult(values_array, base_array, output_array, output_names)
 
     def _attribute_output(
         self,
@@ -119,8 +131,8 @@ class PyTorchBackend:
         if output.ndim == 2 and output.shape[1] >= 2:
             return output
         raise ValueError(
-            "PyTorch models must return one raw scalar or one raw score per "
-            "class for every sample"
+            "PyTorch models must return one scalar or one output vector for "
+            "every sample"
         )
 
     def _output(self, data: Any) -> Any:

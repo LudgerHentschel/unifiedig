@@ -1,7 +1,7 @@
 """Optional automatic-gradient Integrated Gradients for JAX functions."""
 
 import warnings
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 import numpy as np
 
@@ -10,7 +10,7 @@ from .base import BackendResult, classification_score_result
 
 
 class JaxBackend:
-    """Explain scalar or class-score outputs with JAX automatic gradients."""
+    """Explain scalar or vector JAX outputs with automatic gradients."""
 
     input_kind = "jax"
 
@@ -18,7 +18,13 @@ class JaxBackend:
     def supports(cls, model: object) -> bool:
         return isinstance(model, JaxModel)
 
-    def __init__(self, model: object, *, n_steps: int = 64) -> None:
+    def __init__(
+        self,
+        model: object,
+        *,
+        n_steps: int = 64,
+        output_kind: Literal["auto", "regression", "classification"] = "auto",
+    ) -> None:
         try:
             import jax
             import jax.numpy as jnp
@@ -33,6 +39,7 @@ class JaxBackend:
         self._jax = jax
         self._jnp = jnp
         self.n_steps = n_steps
+        self.output_kind = output_kind
         self.dtype = self._resolve_dtype(model.dtype)
         nodes, weights = np.polynomial.legendre.leggauss(n_steps)
         self._nodes = 0.5 * (nodes + 1.0)
@@ -70,7 +77,7 @@ class JaxBackend:
         values_array = np.asarray(values)
         base_array = np.asarray(base_values)
         output_array = np.asarray(output_values)
-        if n_outputs >= 2:
+        if n_outputs >= 2 and self.output_kind != "regression":
             names = self.model.output_names
             if names is None:
                 names = [str(index) for index in range(n_outputs)]
@@ -78,11 +85,19 @@ class JaxBackend:
                 values_array, base_array, output_array, names
             )
         if self.model.output_names not in (None, [], ()):
-            if len(self.model.output_names) != 1:
-                raise ValueError("scalar JAX output accepts at most one output name")
+            expected_names = n_outputs
+            if len(self.model.output_names) != expected_names:
+                raise ValueError(
+                    f"JAX output requires {expected_names} output name"
+                    f"{'s' if expected_names != 1 else ''}"
+                )
             output_names: Optional[List[str]] = list(self.model.output_names)
         else:
-            output_names = None
+            output_names = (
+                [str(index) for index in range(n_outputs)]
+                if n_outputs >= 2
+                else None
+            )
         return BackendResult(
             values_array, base_array, output_array, output_names
         )
@@ -109,7 +124,12 @@ class JaxBackend:
         for baseline_row, baseline_weight in zip(baseline, baseline_weights):
             delta = data - baseline_row
 
-            def accumulate(current: Any, node_weight: Any) -> Any:
+            def accumulate(
+                current: Any,
+                node_weight: Any,
+                baseline_row: Any = baseline_row,
+                delta: Any = delta,
+            ) -> Any:
                 node, weight = node_weight
                 return current + weight * gradient(baseline_row + node * delta), None
 
@@ -146,8 +166,8 @@ class JaxBackend:
         ):
             return output
         raise ValueError(
-            "JAX models must return one raw scalar or one raw score per class "
-            "for every sample"
+            "JAX models must return one scalar or one output vector for "
+            "every sample"
         )
 
     def _resolve_dtype(self, dtype: Any) -> Any:

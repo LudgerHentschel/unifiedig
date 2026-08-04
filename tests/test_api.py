@@ -175,6 +175,24 @@ def test_output_names_must_align_with_output_axis():
         )
 
 
+def test_feature_names_must_align_with_tabular_features():
+    with pytest.raises(ValueError, match="feature_names"):
+        uig.Explanation(
+            values=np.zeros((2, 3)),
+            base_values=np.zeros(2),
+            data=np.zeros((2, 3)),
+            feature_names=["a", "b"],
+        )
+
+
+def test_output_kind_validation_and_known_model_semantics():
+    model = LinearRegression().fit(np.eye(2), np.array([1.0, 2.0]))
+    with pytest.raises(ValueError, match="output_kind must be"):
+        uig.Explainer(model, [0.0, 0.0], output_kind="scores")
+    with pytest.raises(ValueError, match="only needed"):
+        uig.Explainer(model, [0.0, 0.0], output_kind="regression")
+
+
 def test_multiclass_to_shap_preserves_output_axis():
     shap = pytest.importorskip("shap")
     explanation = uig.Explanation(
@@ -189,3 +207,25 @@ def test_multiclass_to_shap_preserves_output_axis():
     assert isinstance(converted, shap.Explanation)
     assert converted.values.shape == (2, 3, 3)
     assert converted.output_names == ["a", "b", "c"]
+
+
+def test_multiclass_contrast_works_with_scalar_shap_plots():
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    pytest.importorskip("shap")
+    explanation = uig.Explanation(
+        values=np.zeros((2, 3, 3)),
+        base_values=np.zeros((2, 3)),
+        data=np.zeros((2, 3)),
+        output_names=["a", "b", "c"],
+    )
+
+    contrast = explanation.contrast("a", "c").to_shap()
+
+    import shap
+    import matplotlib.pyplot as plt
+
+    assert contrast.output_names == "a - c"
+    shap.plots.beeswarm(contrast, show=False)
+    shap.plots.waterfall(contrast[0], show=False)
+    plt.close("all")

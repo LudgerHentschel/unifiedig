@@ -105,6 +105,27 @@ def test_two_score_jax_output_becomes_binary_margin():
     )
 
 
+def test_multi_output_jax_regression_is_not_centered_when_declared():
+    def predict(X):
+        return jnp.stack((X[:, 0] + X[:, 1], X[:, 0] - 2.0 * X[:, 1]), axis=1)
+
+    data = np.array([[1.0, 2.0], [-0.5, 0.7]], dtype=np.float32)
+    model = uig.JaxModel(predict, output_names=["level", "change"])
+    result = uig.Explainer(
+        model,
+        np.zeros(2, dtype=np.float32),
+        output_kind="regression",
+    )(data)
+
+    assert result.values.shape == (2, 2, 2)
+    assert result.output_names == ["level", "change"]
+    np.testing.assert_allclose(
+        result.values.sum(axis=1) + result.base_values,
+        np.asarray(predict(jnp.asarray(data))),
+        atol=1e-6,
+    )
+
+
 def test_vectorized_single_sample_jax_function():
     def predict_one(x, *, offset):
         return jnp.sin(x[0]) + x[1] + offset
@@ -125,7 +146,7 @@ def test_jax_rejects_unsupported_output_shape():
     def bad_predict(X):
         return jnp.ones((X.shape[0], 2, 2))
 
-    with pytest.raises(ValueError, match="one raw scalar"):
+    with pytest.raises(ValueError, match="one scalar or one output vector"):
         uig.Explainer(uig.JaxModel(bad_predict), [0.0, 0.0])([[1.0, 2.0]])
 
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1.dev1
+
+- Add explicit multi-output regression semantics for vector-valued PyTorch
+  and JAX models through `output_kind="regression"`.
+- Harden explanation metadata validation, parameterless PyTorch input dtype
+  handling, numerical diagnostics, and tagged-release verification.
+- Preserve scalar output labels without confusing SHAP's output-axis slicing,
+  including directly plottable multiclass score contrasts.
+
 ## 0.1.1.dev0
 
 - Delegate analytic scikit-learn MLP values and input Jacobians to skgrad.
@@ -7,7 +16,7 @@
   check, including Ridge, Lasso, ElasticNet, and RidgeClassifier.
 - Document the complete supported-model inventory and output scales.
 - Add an opt-in, batched finite-difference fallback for other smooth sklearn
-  regressors and binary decision-score classifiers.
+  regressors and binary or multiclass decision-score classifiers.
 - Reject known discontinuous estimator families from the numerical fallback.
 - Support explicit weighted baseline distributions across every backend and
   consume CBaseline `Background` objects directly through their public

@@ -19,13 +19,16 @@
   centered multiclass log scores, with an explicit zero-probability floor.
 - Document the complete model inventory, output semantics, baseline behavior,
   numerical diagnostics, and SHAP plotting adapter.
+- Distinguish vector class scores from explicitly declared multi-output
+  regression for generic automatic-gradient models.
 
 ## JAX backend
 
 Implemented optional JAX support for differentiable prediction functions with:
 
 - parameters supplied explicitly or captured in a closure;
-- scalar or centered multiclass score output per sample;
+- scalar, multi-output regression, or centered multiclass score output per
+  sample;
 - native JAX automatic gradients;
 - Gauss–Legendre path integration;
 - shared baseline distributions;

@@ -10,7 +10,7 @@ class JaxModel:
 
     ``predict_fn`` is called as ``predict_fn(X, **call_kwargs)`` when
     ``params`` is omitted and as ``predict_fn(params, X, **call_kwargs)``
-    otherwise. It must return one scalar or one raw score per class and sample.
+    otherwise. It must return one scalar or one output vector per sample.
     Set ``vectorize=True`` only when the function accepts a single sample.
     """
 

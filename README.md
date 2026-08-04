@@ -59,9 +59,10 @@ The same public API currently covers:
 - XGBoost and LightGBM models supported by TreeIG;
 - numeric-input CatBoost and other recognized piecewise-constant tree models
   through explicit numerical path-event detection;
-- scalar-output and class-score PyTorch modules;
-- differentiable JAX prediction functions, including functions backed by
-  Flax, NNX, Equinox, or Haiku models; and
+- scalar-output, multi-output regression, and class-score PyTorch modules;
+- differentiable scalar, multi-output regression, and class-score JAX
+  prediction functions, including functions backed by Flax, NNX, Equinox, or
+  Haiku models; and
 - other smooth sklearn regressors and decision-score classifiers through an
   explicit numerical fallback.
 
@@ -111,7 +112,7 @@ Optional capabilities are installed separately:
 | JAX automatic-gradient attribution | `pip install "unifiedig[jax]"` |
 | Conversion to `shap.Explanation` | `pip install "unifiedig[shap]"` |
 | Prediction-neutral weighted backgrounds | `pip install cbaseline` |
-| All UnifiedIG backend and adapter extras | `pip install "unifiedig[all]"` |
+| All Unified IG backend and adapter extras | `pip install "unifiedig[all]"` |
 
 XGBoost and LightGBM models also require their respective model packages.
 
@@ -141,8 +142,8 @@ Unified IG automatically selects the strongest available route:
 | Exact affine | Constant analytic Jacobian from skgrad | Closed form | Linear and regularized linear models |
 | Exact trees | TreeIG split-boundary traces | Exact | Supported sklearn, XGBoost, and LightGBM trees |
 | Differentiable sklearn | Analytic Jacobians from skgrad | Gauss–Legendre quadrature | sklearn MLPs |
-| PyTorch | Automatic gradients through Captum | Gauss–Legendre quadrature | Scalar-output and class-score `torch.nn.Module` models |
-| JAX | Native automatic gradients | Gauss–Legendre quadrature | Differentiable scalar-output and class-score prediction functions |
+| PyTorch | Automatic gradients through Captum | Gauss–Legendre quadrature | Scalar, multi-output regression, and class-score `torch.nn.Module` models |
+| JAX | Native automatic gradients | Gauss–Legendre quadrature | Differentiable scalar, multi-output regression, and class-score functions |
 | Numerical trees | TreeIG path-event detection | Approximate crossing search | CatBoost and recognized unsupported piecewise-constant trees |
 | Numerical fallback | Batched central finite differences | Gauss–Legendre quadrature | Other smooth sklearn estimators |
 
@@ -258,6 +259,7 @@ The default choices are designed to make the common case short:
 | Numerical tree search | 1,024 grid intervals plus four adaptive levels |
 | Completeness checking | Enabled |
 | Black-box numerical fallback | Disabled unless explicitly requested |
+| Vector PyTorch/JAX output | Class scores; declare `output_kind="regression"` for multi-output regression |
 
 Numerical resolution and diagnostics can be adjusted when necessary:
 
@@ -355,14 +357,30 @@ floor explicitly defines the finite score object being explained.
 |---|---|---|
 | sklearn neural networks | Identity-output `MLPRegressor` | Prediction |
 | sklearn neural networks | Binary and multiclass `MLPClassifier` | Logit or centered logit vector |
-| PyTorch | `torch.nn.Module` with one raw scalar or one raw score per class | Model output or centered score vector |
-| JAX | Batched differentiable prediction function with one raw scalar or one raw score per class | Model output or centered score vector |
+| PyTorch | `torch.nn.Module` with one scalar, multiple regression outputs, or one raw score per class | Model output or centered score vector |
+| JAX | Batched differentiable prediction function with one scalar, multiple regression outputs, or one raw score per class | Model output or centered score vector |
 
 sklearn MLP hidden activations may be identity, logistic, tanh, or ReLU.
 Multi-output MLP regression is supported. A two-score PyTorch output becomes
 the single margin `score[1] - score[0]`; three or more scores are centered.
 PyTorch inputs may have any single-tensor sample shape; Unified IG preserves
 the module's device, floating-point dtype, and prior training/evaluation state.
+
+Vector-valued PyTorch and JAX outputs are assumed to be class scores by
+default because the frameworks do not identify whether a generic tensor is a
+classification score vector or a multi-output regression prediction. Declare
+the latter explicitly:
+
+```python
+explanation = uig.Explainer(
+    model,
+    background,
+    output_kind="regression",
+)(X_eval)
+```
+
+Known sklearn and tree estimators expose their task type, so `output_kind` is
+unnecessary and rejected for those models.
 
 JAX functions are wrapped explicitly so Unified IG never guesses whether an
 arbitrary Python callable is JAX-compatible:
@@ -453,6 +471,14 @@ are derived without recomputation:
 class_a_vs_b = explanation.contrast("class_a", "class_b")
 ```
 
+The resulting scalar margin explanation can be plotted directly:
+
+```python
+margin_values = class_a_vs_b.to_shap()
+shap.plots.beeswarm(margin_values)
+shap.plots.waterfall(margin_values[0])
+```
+
 | Field | Meaning |
 |---|---|
 | `values` | Feature attributions; shaped like `data`, with a trailing output axis for multi-output models |
@@ -530,6 +556,7 @@ The stable public surface remains deliberately small:
 ```python
 uig.Explainer
 uig.Explanation
+uig.JaxModel
 uig.Explanation.contrast
 uig.Explanation.to_shap
 ```

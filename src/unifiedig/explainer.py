@@ -2,7 +2,7 @@
 
 import warnings
 from numbers import Real
-from typing import Any, Optional, Sequence, Type
+from typing import Any, Literal, Optional, Sequence, Type
 
 import numpy as np
 
@@ -47,6 +47,11 @@ class Explainer:
     zero. Specialized backends always take precedence.
     Differentiable JAX functions are selected explicitly by wrapping them in
     :class:`unifiedig.JaxModel`.
+
+    Vector-valued PyTorch and JAX outputs are treated as class scores by
+    default. Set ``output_kind="regression"`` for multi-output regression.
+    Known sklearn and tree estimators declare their own output semantics and
+    do not need this option.
     """
 
     def __init__(
@@ -65,6 +70,7 @@ class Explainer:
         tree_grid_size: int = 1024,
         tree_max_refine: int = 4,
         probability_floor: Optional[float] = None,
+        output_kind: Literal["auto", "regression", "classification"] = "auto",
     ) -> None:
         if not isinstance(n_steps, int) or isinstance(n_steps, bool) or n_steps < 1:
             raise ValueError("n_steps must be a positive integer")
@@ -73,6 +79,10 @@ class Explainer:
         if fallback not in (None, "finite_difference", "tree_numeric"):
             raise ValueError(
                 "fallback must be None, 'finite_difference', or 'tree_numeric'"
+            )
+        if output_kind not in ("auto", "regression", "classification"):
+            raise ValueError(
+                "output_kind must be 'auto', 'regression', or 'classification'"
             )
         if (
             not isinstance(finite_difference_step, Real)
@@ -110,6 +120,7 @@ class Explainer:
         self.baseline = baseline
         self.baseline_weights = baseline_weights
         self.n_steps = n_steps
+        self.output_kind = output_kind
         self.check_completeness = check_completeness
         self.completeness_atol = self._validate_tolerance(
             "completeness_atol", completeness_atol
@@ -119,6 +130,12 @@ class Explainer:
         )
         backend_type = next((item for item in _BACKENDS if item.supports(model)), None)
         if backend_type is None:
+            if output_kind != "auto":
+                raise ValueError(
+                    "output_kind is only needed for ambiguous PyTorch and "
+                    "JAX outputs; sklearn and tree models declare their "
+                    "output semantics"
+                )
             if fallback is None:
                 raise TypeError(
                     f"no Unified IG backend supports {type(model).__name__}; "
@@ -157,7 +174,18 @@ class Explainer:
                     stacklevel=2,
                 )
         else:
-            self._backend = backend_type(model, n_steps=n_steps)
+            if backend_type in (PyTorchBackend, JaxBackend):
+                self._backend = backend_type(
+                    model, n_steps=n_steps, output_kind=output_kind
+                )
+            else:
+                if output_kind != "auto":
+                    raise ValueError(
+                        "output_kind is only needed for ambiguous PyTorch and "
+                        "JAX outputs; sklearn and tree models declare their "
+                        "output semantics"
+                    )
+                self._backend = backend_type(model, n_steps=n_steps)
 
     def __call__(self, data: Any) -> Explanation:
         feature_names = self._feature_names(data)
@@ -214,7 +242,9 @@ class Explainer:
                 warnings.warn(
                     "Integrated Gradients completeness tolerance was not met; "
                     f"maximum absolute error is {np.max(np.abs(completeness_error)):.3g}. "
-                    "Increase n_steps for numerical backends.",
+                    "Increase the relevant numerical resolution (n_steps for "
+                    "gradient integration, or tree_grid_size/tree_max_refine "
+                    "for numerical trees).",
                     RuntimeWarning,
                     stacklevel=2,
                 )

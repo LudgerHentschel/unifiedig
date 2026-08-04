@@ -123,6 +123,15 @@ def normalize_torch_inputs(
         ) from exc
 
     data_source = data.to_numpy() if hasattr(data, "to_numpy") else data
+    if isinstance(data_source, np.ndarray) and not data_source.flags.writeable:
+        data_source = data_source.copy()
+    if dtype is None:
+        source = torch.as_tensor(data_source)
+        dtype = (
+            source.dtype
+            if source.is_floating_point()
+            else torch.get_default_dtype()
+        )
     normalized_data = torch.as_tensor(
         data_source, device=device, dtype=dtype
     ).detach()
@@ -137,6 +146,8 @@ def normalize_torch_inputs(
     baseline_source = (
         baseline.to_numpy() if hasattr(baseline, "to_numpy") else baseline
     )
+    if isinstance(baseline_source, np.ndarray) and not baseline_source.flags.writeable:
+        baseline_source = baseline_source.copy()
     normalized_baseline = torch.as_tensor(
         baseline_source,
         device=normalized_data.device,

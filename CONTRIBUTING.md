@@ -1,7 +1,8 @@
 # Contributing
 
-Unified IG is in an early design phase. Changes should preserve its small,
-model-agnostic public API and keep model-specific behavior inside backends.
+Unified IG is under active development. Changes should preserve its small,
+model-agnostic public API, consistent output semantics, and shared baseline
+handling while keeping model-specific behavior inside backends.
 
 ## Development setup
 
@@ -23,4 +24,3 @@ python -m twine check dist/*
 
 New backends should include completeness tests showing that attribution sums
 recover the explained model output relative to the baseline output.
-

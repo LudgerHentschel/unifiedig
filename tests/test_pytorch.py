@@ -95,6 +95,21 @@ def test_structured_tensor_input_and_scalar_baseline():
     )
 
 
+def test_parameterless_torch_model_promotes_integer_inputs_to_float():
+    class ScaledSum(torch.nn.Module):
+        def forward(self, inputs):
+            return 0.5 * inputs.sum(dim=1)
+
+    result = uig.Explainer(ScaledSum(), 0)([[1, 2], [3, 4]])
+
+    assert result.values.dtype == np.float32
+    np.testing.assert_allclose(
+        result.values.sum(axis=1) + result.base_values,
+        [1.5, 3.5],
+        atol=1e-6,
+    )
+
+
 def test_dataframe_input_preserves_feature_names_for_torch():
     model = torch.nn.Linear(2, 1)
     data = pd.DataFrame([[0.5, -0.25]], columns=["age", "income"])
@@ -154,6 +169,25 @@ def test_two_score_torch_model_becomes_one_binary_margin():
     np.testing.assert_allclose(
         result.values.sum(axis=1) + result.base_values,
         raw_scores[:, 1] - raw_scores[:, 0],
+        atol=1e-8,
+    )
+
+
+def test_multi_output_torch_regression_is_not_centered_when_declared():
+    model = torch.nn.Linear(2, 2, bias=False).double()
+    with torch.no_grad():
+        model.weight.copy_(torch.tensor([[1.0, 2.0], [-0.5, 3.0]]).double())
+    data = torch.tensor([[1.0, 2.0], [-0.5, 0.7]], dtype=torch.float64)
+
+    result = uig.Explainer(
+        model, [0.0, 0.0], output_kind="regression"
+    )(data)
+
+    assert result.values.shape == (2, 2, 2)
+    assert result.output_names == ["0", "1"]
+    np.testing.assert_allclose(
+        result.values.sum(axis=1) + result.base_values,
+        model(data).detach().numpy(),
         atol=1e-8,
     )
 

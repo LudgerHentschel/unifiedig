@@ -53,6 +53,13 @@ class Explanation:
                 raise ValueError(
                     f"output_names must contain {expected_outputs} names"
                 )
+        if self.feature_names is not None:
+            feature_names = [str(name) for name in self.feature_names]
+            object.__setattr__(self, "feature_names", feature_names)
+            if data.ndim == 2 and len(feature_names) != data.shape[1]:
+                raise ValueError(
+                    f"feature_names must contain {data.shape[1]} names"
+                )
         if self.completeness_error is not None:
             completeness_error = np.asarray(self.completeness_error)
             object.__setattr__(self, "completeness_error", completeness_error)
@@ -142,10 +149,15 @@ class Explanation:
             raise ImportError(
                 "SHAP is optional. Install it with `pip install unifiedig[shap]`."
             ) from exc
+        output_names: Any = self.output_names
+        if self.values.shape == self.data.shape and output_names is not None:
+            # SHAP interprets a one-element list as a separate output axis and
+            # then fails to slice per-sample base values for scalar plots.
+            output_names = output_names[0]
         return shap.Explanation(
             values=self.values,
             base_values=self.base_values,
             data=self.data,
             feature_names=self.feature_names,
-            output_names=self.output_names,
+            output_names=output_names,
         )
