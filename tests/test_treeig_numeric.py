@@ -85,6 +85,36 @@ def _centered_log_probabilities(model, X, floor):
     return log_probabilities - log_probabilities.mean(axis=1, keepdims=True)
 
 
+def _forest_score_crossing_oracle(model, baseline, data, floor, target=None):
+    """Enumerate sklearn split crossings to validate numerical allocations."""
+    direction = data - baseline
+    crossings = {}
+    for estimator in model.estimators_:
+        tree = estimator.tree_
+        for feature, threshold in zip(tree.feature, tree.threshold):
+            if feature < 0 or direction[feature] == 0.0:
+                continue
+            time = (threshold - baseline[feature]) / direction[feature]
+            if 0.0 < time < 1.0:
+                crossings.setdefault(float(time), set()).add(int(feature))
+
+    times = sorted(crossings)
+    attribution = np.zeros(data.shape[0])
+    for index, time in enumerate(times):
+        features = crossings[time]
+        assert len(features) == 1  # Different-feature ties need a convention.
+        left = 0.5 * ((times[index - 1] if index else 0.0) + time)
+        right = 0.5 * (time + (times[index + 1] if index + 1 < len(times) else 1.0))
+        points = baseline + np.array([left, right])[:, None] * direction
+        scores = _centered_log_probabilities(model, points, floor)
+        if scores.shape[1] == 2:
+            jump = scores[1, 1] - scores[1, 0] - scores[0, 1] + scores[0, 0]
+        else:
+            jump = scores[1, target] - scores[0, target]
+        attribution[features.pop()] += jump
+    return attribution
+
+
 def test_binary_probability_tree_uses_derived_log_odds():
     X, y = make_classification(n_samples=50, n_features=4, random_state=13)
     model = RandomForestClassifier(n_estimators=5, random_state=13).fit(X, y)
@@ -119,6 +149,36 @@ def test_binary_probability_tree_uses_derived_log_odds():
     )
 
 
+def test_binary_probability_forest_allocations_match_split_crossings():
+    X, y = make_classification(n_samples=60, n_features=4, random_state=17)
+    model = RandomForestClassifier(
+        n_estimators=7, max_depth=3, random_state=17
+    ).fit(X, y)
+    baselines = X[:2]
+    weights = np.array([0.4, 0.6])
+    explained = X[20]
+    floor = 1e-6
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        result = uig.Explainer(
+            model,
+            baselines,
+            baseline_weights=weights,
+            fallback="tree_numeric",
+            probability_floor=floor,
+            tree_grid_size=1024,
+        )(explained)
+
+    expected = sum(
+        weight * _forest_score_crossing_oracle(
+            model, baseline, explained, floor
+        )
+        for baseline, weight in zip(baselines, weights)
+    )
+    np.testing.assert_allclose(result.values[0], expected, atol=1e-12)
+
+
 def test_multiclass_probability_tree_uses_centered_log_scores():
     X, y = make_classification(
         n_samples=80,
@@ -140,7 +200,7 @@ def test_multiclass_probability_tree_uses_centered_log_scores():
             X[:2],
             fallback="tree_numeric",
             probability_floor=floor,
-            tree_grid_size=256,
+            tree_grid_size=1024,
         )
     assert any("centered multiclass" in str(item.message) for item in caught)
     assert any("path-event detection" in str(item.message) for item in caught)
@@ -154,6 +214,21 @@ def test_multiclass_probability_tree_uses_centered_log_scores():
         expected,
         atol=1e-12,
     )
+    crossing_values = np.column_stack(
+        [
+            np.mean(
+                [
+                    _forest_score_crossing_oracle(
+                        model, baseline, X[20], floor, target
+                    )
+                    for baseline in X[:2]
+                ],
+                axis=0,
+            )
+            for target in range(3)
+        ]
+    )
+    np.testing.assert_allclose(result.values[0], crossing_values, atol=1e-12)
 
 
 def test_probability_tree_requires_floor_when_path_reaches_zero():

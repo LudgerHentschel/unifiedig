@@ -327,6 +327,13 @@ Unified IG transforms the complete model probability vector. Binary models use
 transformation of the forest probability after aggregation, not a sum of
 separately transformed tree outputs.
 
+This transformation uses the canonical score vector implied by the complete
+probability vector: applying softmax to the centered log scores recovers the
+original probabilities, and every pairwise score difference is the associated
+log odds. It does not claim to recover an unavailable training-time margin;
+the derived log-score vector is the explicitly defined model output being
+explained.
+
 Tree probabilities can be exactly zero. Unified IG never clips them silently:
 if any evaluated path point has zero probability, attribution raises unless
 the user supplies `probability_floor`. The floor is applied to every class and
