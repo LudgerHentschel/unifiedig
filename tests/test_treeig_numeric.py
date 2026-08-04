@@ -253,6 +253,9 @@ def test_numeric_tree_options_are_validated():
 
     with pytest.raises(ValueError, match="tree_grid_size"):
         uig.Explainer(model, X[0], tree_grid_size=0)
+    for max_refine in (-1, 1.5, True):
+        with pytest.raises(ValueError, match="tree_max_refine"):
+            uig.Explainer(model, X[0], tree_max_refine=max_refine)
     for floor in (0.0, 1.0, -0.1, np.inf):
         with pytest.raises(ValueError, match="probability_floor"):
             uig.Explainer(model, X[0], probability_floor=floor)

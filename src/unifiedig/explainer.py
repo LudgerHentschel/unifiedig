@@ -63,6 +63,7 @@ class Explainer:
         finite_difference_step: float = 1e-5,
         finite_difference_batch_size: int = 8192,
         tree_grid_size: int = 1024,
+        tree_max_refine: int = 4,
         probability_floor: Optional[float] = None,
     ) -> None:
         if not isinstance(n_steps, int) or isinstance(n_steps, bool) or n_steps < 1:
@@ -91,6 +92,12 @@ class Explainer:
             or tree_grid_size < 1
         ):
             raise ValueError("tree_grid_size must be a positive integer")
+        if (
+            not isinstance(tree_max_refine, int)
+            or isinstance(tree_max_refine, bool)
+            or tree_max_refine < 0
+        ):
+            raise ValueError("tree_max_refine must be a nonnegative integer")
         if probability_floor is not None and (
             not isinstance(probability_floor, Real)
             or isinstance(probability_floor, bool)
@@ -123,6 +130,7 @@ class Explainer:
                 self._backend = TreeIGNumericBackend(
                     model,
                     n_steps=tree_grid_size,
+                    max_refine=tree_max_refine,
                     probability_floor=(
                         None
                         if probability_floor is None

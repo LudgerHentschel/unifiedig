@@ -255,6 +255,7 @@ The default choices are designed to make the common case short:
 | Baseline matrix | Shared distribution; equally weighted unless weights are supplied |
 | Path | Straight line from each baseline to each input |
 | Numerical integration | 64-point Gauss–Legendre quadrature |
+| Numerical tree search | 1,024 grid intervals plus four adaptive levels |
 | Completeness checking | Enabled |
 | Black-box numerical fallback | Disabled unless explicitly requested |
 
@@ -299,18 +300,20 @@ explainer = uig.Explainer(
     model,
     background,
     fallback="tree_numeric",
-    tree_grid_size=256,
+    tree_grid_size=1024,
+    tree_max_refine=4,
     probability_floor=1e-6,  # needed only if class probabilities can reach zero
 )
 ```
 
-This route scans each baseline-to-input path for output jumps and locally
-probes detected events to identify responsible features. It supports weighted
-background distributions and preserves Unified IG's binary-margin and
-centered-multiclass score semantics. CatBoost uses `RawFormulaVal`, not
-probabilities. Native categorical inputs are excluded because straight-line
-interpolation between category codes is not meaningful; numeric and externally
-encoded inputs are supported.
+This route scans each baseline-to-input path for output jumps, adaptively
+bisects changed intervals, and then probes detected events to identify
+responsible features. It supports weighted background distributions and
+preserves Unified IG's binary-margin and centered-multiclass score semantics.
+`tree_max_refine` defaults to four bisection levels; zero recovers fixed-grid
+behavior. CatBoost uses `RawFormulaVal`, not probabilities. Native categorical
+inputs are excluded because straight-line interpolation between category codes
+is not meaningful; numeric and externally encoded inputs are supported.
 
 Unlike structural TreeIG, event detection is approximate. `tree_grid_size`
 sets the number of scanned path intervals and defaults to 1,024. Unified IG's
@@ -320,10 +323,10 @@ Exact structural backends always take precedence even when this fallback is
 requested.
 
 For allocation-sensitive numerical-tree work, rerun a representative subset
-with `tree_grid_size=4096` or `8192` and compare the feature attributions, not
-only their completeness residuals. Resolution stability is the relevant check
-for nearby merged crossings; no fixed black-box grid guarantees that every
-pair of events is separated.
+with a larger `tree_grid_size` and compare the feature attributions, not only
+their completeness residuals. Resolution stability is the relevant check for
+nearby or offsetting crossings; adaptive refinement cannot subdivide a coarse
+interval whose endpoints have identical outputs.
 
 For `DecisionTreeClassifier`, `RandomForestClassifier`, and
 `ExtraTreesClassifier`, which expose probabilities but no native score,

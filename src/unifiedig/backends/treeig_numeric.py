@@ -47,13 +47,14 @@ class TreeIGNumericBackend:
         model: object,
         *,
         n_steps: int = 1024,
+        max_refine: int = 4,
         probability_floor: Optional[float] = None,
     ) -> None:
         try:
             import treeig
         except ImportError as exc:
             raise ImportError(
-                "Numerical tree support requires TreeIG 0.1.10 or newer. "
+                "Numerical tree support requires TreeIG 0.1.11 or newer. "
                 "Install it with `pip install unifiedig[trees]`."
             ) from exc
         if not self.supports(model):
@@ -76,6 +77,7 @@ class TreeIGNumericBackend:
             )
         self.model = model
         self.grid_size = n_steps
+        self.max_refine = max_refine
         self.probability_floor = probability_floor
         self._treeig = treeig
 
@@ -140,6 +142,7 @@ class TreeIGNumericBackend:
                         else None
                     ),
                     grid_size=self.grid_size,
+                    max_refine=self.max_refine,
                     warn_residual=False,
                 )
             values += float(weight) * explainer.attribute(data)

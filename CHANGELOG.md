@@ -25,6 +25,8 @@
 - Support probability-only decision-tree and forest classifiers through
   explicit binary-log-odds or centered-multiclass-log-score transformation,
   with no silent handling of zero probabilities.
+- Use TreeIG's batched adaptive refinement for changed numerical-tree path
+  intervals and expose `tree_max_refine` as a convergence control.
 - Expand the README with computation routes, model coverage, baseline guidance,
   SHAP plotting, numerical diagnostics, and JAX usage.
 
