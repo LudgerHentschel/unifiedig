@@ -319,6 +319,12 @@ crossings can still affect feature allocation without producing a residual.
 Exact structural backends always take precedence even when this fallback is
 requested.
 
+For allocation-sensitive numerical-tree work, rerun a representative subset
+with `tree_grid_size=4096` or `8192` and compare the feature attributions, not
+only their completeness residuals. Resolution stability is the relevant check
+for nearby merged crossings; no fixed black-box grid guarantees that every
+pair of events is separated.
+
 For `DecisionTreeClassifier`, `RandomForestClassifier`, and
 `ExtraTreesClassifier`, which expose probabilities but no native score,
 Unified IG transforms the complete model probability vector. Binary models use
