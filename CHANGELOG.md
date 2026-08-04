@@ -15,8 +15,12 @@
 - Attribute multiclass models as one centered, zero-sum decision-score vector
   across skgrad, TreeIG, PyTorch, and numerical backends.
 - Add `Explanation.contrast()` for derived pairwise score-margin attribution.
+- Add optional JAX automatic-gradient attribution through the explicit
+  `JaxModel` adapter, including parameter pytrees, closures, single-sample
+  vectorization, weighted backgrounds, and centered multiclass scores.
+- Add a JAX example, optional dependency extra, and dedicated CI job.
 - Expand the README with computation routes, model coverage, baseline guidance,
-  SHAP plotting, numerical diagnostics, and the planned JAX scope.
+  SHAP plotting, numerical diagnostics, and JAX usage.
 
 ## 0.1.0
 

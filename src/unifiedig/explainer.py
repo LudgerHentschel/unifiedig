@@ -9,11 +9,12 @@ import numpy as np
 from .backends import (
     Backend,
     FiniteDifferenceBackend,
+    JaxBackend,
     PyTorchBackend,
     SkgradBackend,
     TreeIGBackend,
 )
-from .baselines import normalize_inputs, normalize_torch_inputs
+from .baselines import normalize_inputs, normalize_jax_inputs, normalize_torch_inputs
 from .explanation import Explanation
 
 
@@ -21,6 +22,7 @@ _BACKENDS: Sequence[Type[Backend]] = (
     SkgradBackend,
     TreeIGBackend,
     PyTorchBackend,
+    JaxBackend,
 )
 
 
@@ -38,6 +40,8 @@ class Explainer:
     Probability attributions are intentionally not offered. Set
     ``fallback="finite_difference"`` to explain an otherwise unsupported smooth
     sklearn estimator numerically; specialized backends always take precedence.
+    Differentiable JAX functions are selected explicitly by wrapping them in
+    :class:`unifiedig.JaxModel`.
     """
 
     def __init__(
@@ -107,7 +111,8 @@ class Explainer:
 
     def __call__(self, data: Any) -> Explanation:
         feature_names = self._feature_names(data)
-        if getattr(self._backend, "input_kind", "numpy") == "torch":
+        input_kind = getattr(self._backend, "input_kind", "numpy")
+        if input_kind == "torch":
             (
                 normalized_data,
                 normalized_baseline,
@@ -120,6 +125,16 @@ class Explainer:
                 dtype=self._backend.dtype,
             )
             explanation_data = normalized_data.detach().cpu().numpy()
+        elif input_kind == "jax":
+            normalized_data, normalized_baseline, normalized_weights = (
+                normalize_jax_inputs(
+                    data,
+                    self.baseline,
+                    self.baseline_weights,
+                    dtype=self._backend.dtype,
+                )
+            )
+            explanation_data = np.asarray(normalized_data)
         else:
             normalized_data, normalized_baseline, normalized_weights = normalize_inputs(
                 data, self.baseline, self.baseline_weights

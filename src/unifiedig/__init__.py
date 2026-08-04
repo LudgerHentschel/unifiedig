@@ -4,8 +4,9 @@ from importlib.metadata import PackageNotFoundError, version
 
 from .explainer import Explainer
 from .explanation import Explanation
+from .jax import JaxModel
 
-__all__ = ["Explainer", "Explanation"]
+__all__ = ["Explainer", "Explanation", "JaxModel"]
 
 try:
     __version__ = version("unifiedig")

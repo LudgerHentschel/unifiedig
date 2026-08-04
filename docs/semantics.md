@@ -10,9 +10,9 @@ explanation = unifiedig.Explainer(model, baseline)(data)
 ## Inputs and baselines
 
 For sklearn, `data` is one sample with shape `(features,)` or a batch with shape
-`(samples, features)`. PyTorch additionally accepts structured single-tensor
-inputs with any shape `(samples, ...)`. A baseline may be a scalar, one sample,
-or a baseline distribution with shape `(baselines, ...)`. Optional
+`(samples, features)`. PyTorch and JAX additionally accept structured
+single-array inputs with any shape `(samples, ...)`. A baseline may be a
+scalar, one sample, or a baseline distribution with shape `(baselines, ...)`. Optional
 `baseline_weights` must align with its rows. A background object exposing
 `rows` and `weights`, including a CBaseline `Background`, may be passed
 directly. Unified IG—not individual backends—validates and normalizes the
@@ -114,6 +114,12 @@ Numerical backends use Gauss–Legendre quadrature on the unit path interval.
 `Explainer(..., n_steps=N)` controls the number of quadrature nodes. More nodes
 usually improve accuracy but require proportionally more gradient evaluations.
 The default is 64.
+
+PyTorch uses Captum's Gauss–Legendre implementation. JAX evaluates native
+automatic gradients at the same quadrature nodes. A JAX prediction function
+must produce samplewise outputs: one scalar or one raw class-score vector for
+each leading input row. Two class scores are reduced to their margin, and
+three or more are centered under the multiclass convention above.
 
 When explicitly enabled with `fallback="finite_difference"`, Unified IG uses
 central finite differences to approximate gradients for otherwise unsupported

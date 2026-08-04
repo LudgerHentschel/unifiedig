@@ -55,12 +55,11 @@ The same public API currently covers:
 - sklearn multilayer perceptrons;
 - supported sklearn decision trees and ensembles;
 - XGBoost and LightGBM models supported by TreeIG;
-- scalar-output and class-score PyTorch modules; and
+- scalar-output and class-score PyTorch modules;
+- differentiable JAX prediction functions, including functions backed by
+  Flax, NNX, Equinox, or Haiku models; and
 - other smooth sklearn regressors and decision-score classifiers through an
   explicit numerical fallback.
-
-JAX support is the next planned model backend. See
-[Planned JAX support](#planned-jax-support).
 
 ## Quick start
 
@@ -104,12 +103,12 @@ Optional capabilities are installed separately:
 |---|---|
 | Exact sklearn, XGBoost, and LightGBM tree attribution | `pip install "unifiedig[trees]"` |
 | PyTorch attribution through Captum | `pip install "unifiedig[torch]"` |
+| JAX automatic-gradient attribution | `pip install "unifiedig[jax]"` |
 | Conversion to `shap.Explanation` | `pip install "unifiedig[shap]"` |
 | Prediction-neutral weighted backgrounds | `pip install cbaseline` |
 | All UnifiedIG backend and adapter extras | `pip install "unifiedig[all]"` |
 
-XGBoost and LightGBM models also require their respective model packages. JAX
-is planned but is not included in the current release.
+XGBoost and LightGBM models also require their respective model packages.
 
 ## One attribution mechanism
 
@@ -138,6 +137,7 @@ Unified IG automatically selects the strongest available route:
 | Exact trees | TreeIG split-boundary traces | Exact | Supported sklearn, XGBoost, and LightGBM trees |
 | Differentiable sklearn | Analytic Jacobians from skgrad | Gauss–Legendre quadrature | sklearn MLPs |
 | PyTorch | Automatic gradients through Captum | Gauss–Legendre quadrature | Scalar-output and class-score `torch.nn.Module` models |
+| JAX | Native automatic gradients | Gauss–Legendre quadrature | Differentiable scalar-output and class-score prediction functions |
 | Numerical fallback | Batched central finite differences | Gauss–Legendre quadrature | Other smooth sklearn estimators |
 
 Specialized routes always take precedence over the fallback. Users get exact
@@ -290,12 +290,31 @@ as finite numeric inputs and numeric splits—also apply through Unified IG.
 | sklearn neural networks | Identity-output `MLPRegressor` | Prediction |
 | sklearn neural networks | Binary and multiclass `MLPClassifier` | Logit or centered logit vector |
 | PyTorch | `torch.nn.Module` with one raw scalar or one raw score per class | Model output or centered score vector |
+| JAX | Batched differentiable prediction function with one raw scalar or one raw score per class | Model output or centered score vector |
 
 sklearn MLP hidden activations may be identity, logistic, tanh, or ReLU.
 Multi-output MLP regression is supported. A two-score PyTorch output becomes
 the single margin `score[1] - score[0]`; three or more scores are centered.
 PyTorch inputs may have any single-tensor sample shape; Unified IG preserves
 the module's device, floating-point dtype, and prior training/evaluation state.
+
+JAX functions are wrapped explicitly so Unified IG never guesses whether an
+arbitrary Python callable is JAX-compatible:
+
+```python
+import unifiedig as uig
+
+model = uig.JaxModel(predict_fn, params=params)
+explanation = uig.Explainer(model, background)(X_eval)
+```
+
+If parameters are captured in a closure, omit `params`. Functions that accept
+one sample instead of a batch use `vectorize=True`. Optional `call_kwargs`,
+`output_names`, and `dtype` make inference behavior explicit. A Flax
+Linen-style model, for example, can use
+`uig.JaxModel(model.apply, params=variables)`. Callable NNX and Equinox models
+can be wrapped directly. Haiku and stateful framework APIs can be exposed
+through a small inference closure.
 
 ### Opt-in numerical fallback
 
@@ -391,37 +410,12 @@ fallback, `finite_difference_step` may also matter. A small completeness
 residual is an important diagnostic, but it does not prove that an arbitrary
 model is smooth or that every individual attribution is accurate.
 
-## Planned JAX support
-
-JAX support is the next planned backend and is **not yet part of the installed
-package**.
-
-The intended first implementation provides:
-
-- a differentiable, batched JAX prediction function;
-- parameters supplied explicitly or captured in a closure;
-- one raw scalar or one raw score per class and sample;
-- native JAX automatic gradients;
-- Gauss–Legendre path integration;
-- shared baseline distributions and completeness diagnostics; and
-- clear JAX dtype and 64-bit-mode behavior.
-
-Flax, Equinox, NNX, Haiku, and hand-written JAX models should work through thin
-prediction-function adapters rather than separate public explainer classes.
-The final constructor spelling will be fixed with the implementation; explicit
-framework selection is preferable to guessing whether an arbitrary Python
-callable is JAX-compatible.
-
-The planned optional installation will be `pip install "unifiedig[jax]"` once
-that extra exists.
-
 ## Current gaps and deferred scope
 
-Notable remaining ecosystem gaps include JAX, TensorFlow/Keras, CatBoost, and
+Notable remaining ecosystem gaps include TensorFlow/Keras, CatBoost, and
 classifiers whose natural outputs are probabilities or vote shares rather
-than additive decision scores. These
-need explicit output semantics or specialized path support rather than a silent
-finite-difference approximation.
+than additive decision scores. These need explicit output semantics or
+specialized path support rather than a silent finite-difference approximation.
 
 Also deferred:
 
@@ -439,6 +433,7 @@ Complete examples are available for:
 - [sklearn MLP regression](examples/mlp_regression.py)
 - [sklearn MLP classification](examples/mlp_classification.py)
 - [PyTorch](examples/pytorch.py)
+- [JAX](examples/jax_model.py)
 - [the numerical fallback](examples/numerical_fallback.py)
 
 ## Development

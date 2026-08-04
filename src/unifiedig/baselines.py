@@ -178,3 +178,73 @@ def normalize_torch_inputs(
         dtype=normalized_data.dtype,
     )
     return normalized_data, normalized_baseline, normalized_weights
+
+
+def normalize_jax_inputs(
+    data: Any,
+    baseline: Any,
+    baseline_weights: Optional[Any] = None,
+    *,
+    dtype: Any = None,
+) -> Tuple[Any, Any, Any]:
+    """Normalize JAX inputs and a weighted baseline distribution."""
+
+    try:
+        import jax
+        import jax.numpy as jnp
+    except ImportError as exc:  # pragma: no cover - selected only with JAX present
+        raise ImportError(
+            "JAX support is optional. Install it with `pip install unifiedig[jax]`."
+        ) from exc
+
+    data_source = data.to_numpy() if hasattr(data, "to_numpy") else data
+    source_dtype = np.asarray(data_source).dtype
+    if dtype is None:
+        requested = (
+            source_dtype
+            if np.issubdtype(source_dtype, np.floating)
+            else np.float32
+        )
+        dtype = jax.dtypes.canonicalize_dtype(requested)
+    normalized_data = jnp.asarray(data_source, dtype=dtype)
+    if normalized_data.ndim == 1:
+        normalized_data = normalized_data.reshape(1, -1)
+    if normalized_data.ndim < 2 or normalized_data.shape[0] == 0:
+        raise ValueError("data must contain a non-empty leading sample dimension")
+    if not bool(jnp.isfinite(normalized_data).all()):
+        raise ValueError("data must contain only finite values")
+
+    baseline, baseline_weights = _baseline_parts(baseline, baseline_weights)
+    baseline_source = (
+        baseline.to_numpy() if hasattr(baseline, "to_numpy") else baseline
+    )
+    normalized_baseline = jnp.asarray(baseline_source, dtype=normalized_data.dtype)
+    sample_shape = normalized_data.shape[1:]
+    if normalized_baseline.ndim == 0:
+        normalized_baseline = jnp.full(
+            (1, *sample_shape), normalized_baseline.item(), dtype=normalized_data.dtype
+        )
+    elif tuple(normalized_baseline.shape) == tuple(sample_shape):
+        normalized_baseline = normalized_baseline[None, ...]
+    elif (
+        normalized_baseline.ndim != normalized_data.ndim
+        or tuple(normalized_baseline.shape[1:]) != tuple(sample_shape)
+    ):
+        raise ValueError(
+            "baseline must be scalar, have the input sample shape, or be a "
+            "baseline distribution with matching sample shape"
+        )
+    if normalized_baseline.shape[0] == 0:
+        raise ValueError("baseline distribution must contain at least one row")
+    if not bool(jnp.isfinite(normalized_baseline).all()):
+        raise ValueError("baseline must contain only finite values")
+
+    weight_array = normalize_baseline_weights(
+        baseline_weights, n_baselines=normalized_baseline.shape[0]
+    )
+    positive = weight_array > 0
+    return (
+        normalized_data,
+        normalized_baseline[jnp.asarray(positive)],
+        jnp.asarray(weight_array[positive], dtype=normalized_data.dtype),
+    )
