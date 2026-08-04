@@ -4,6 +4,7 @@ from typing import Any, Dict, Literal, Optional
 
 import numpy as np
 
+from .._keras import validate_keras_output
 from .base import BackendResult, classification_score_result
 
 
@@ -37,6 +38,7 @@ class PyTorchBackend:
             ) from exc
 
         self.model = model
+        validate_keras_output(model, output_kind)
         self._torch = torch
         self.n_steps = n_steps
         tensors = list(model.parameters()) + list(model.buffers())

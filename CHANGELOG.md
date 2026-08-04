@@ -2,8 +2,15 @@
 
 ## 0.1.1.dev1
 
-- Add explicit multi-output regression semantics for vector-valued PyTorch
-  and JAX models through `output_kind="regression"`.
+- Add TensorFlow automatic-gradient attribution and direct TensorFlow-backed
+  Keras model dispatch through the optional `tensorflow` extra.
+- Route Keras 3 models through their configured TensorFlow, JAX, or PyTorch
+  backend, and reject visible sigmoid/softmax probability heads for
+  classification attribution.
+- Add the explicit `TensorFlowModel` adapter for arbitrary differentiable
+  TensorFlow prediction functions.
+- Add explicit multi-output regression semantics for vector-valued PyTorch,
+  JAX, and TensorFlow models through `output_kind="regression"`.
 - Harden explanation metadata validation, parameterless PyTorch input dtype
   handling, numerical diagnostics, and tagged-release verification.
 - Preserve scalar output labels without confusing SHAP's output-axis slicing,

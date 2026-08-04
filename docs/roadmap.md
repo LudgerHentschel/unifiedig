@@ -1,6 +1,6 @@
 # Roadmap
 
-## Current development line — 0.1.1.dev0
+## Current development line — 0.1.1.dev1
 
 - Delegate smooth sklearn model support and analytic input Jacobians to skgrad.
 - Recognize affine regression and binary or multiclass score-classification
@@ -21,6 +21,8 @@
   numerical diagnostics, and SHAP plotting adapter.
 - Distinguish vector class scores from explicitly declared multi-output
   regression for generic automatic-gradient models.
+- Add native TensorFlow automatic gradients, direct TensorFlow-backed Keras
+  models, and backend-native Keras 3 dispatch for JAX and PyTorch.
 
 ## JAX backend
 
@@ -38,6 +40,16 @@ Implemented optional JAX support for differentiable prediction functions with:
 JAX libraries such as Flax, Equinox, NNX, and Haiku are supported through the
 lightweight public `JaxModel` adapter rather than separate explainer classes.
 
+## TensorFlow and Keras
+
+Implemented optional TensorFlow support with native `GradientTape`
+derivatives, quadrature nodes batched into each model pass, shared weighted
+backgrounds, scalar and vector outputs, and an explicit `TensorFlowModel`
+adapter for arbitrary prediction functions. TensorFlow-backed Keras models
+work directly. Keras 3 models configured for JAX or PyTorch reuse those native
+Unified IG backends instead of introducing a Keras-specific differentiation
+layer.
+
 ## Before the next published release
 
 - Run source-tree and installed-wheel tests for all optional backends.
@@ -46,7 +58,7 @@ lightweight public `JaxModel` adapter rather than separate explainer classes.
 
 ## Deferred work
 
-- TensorFlow/Keras support.
+- Multiple-input and structured-output deep-learning models.
 - Exact structural CatBoost, probability-averaging forest, and sklearn
   histogram-gradient-boosting support.
 - Exact piecewise-linear IG for ReLU networks by detecting activation-region

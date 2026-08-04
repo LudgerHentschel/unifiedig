@@ -10,13 +10,13 @@ explanation = unifiedig.Explainer(model, baseline)(data)
 ## Inputs and baselines
 
 For sklearn, `data` is one sample with shape `(features,)` or a batch with shape
-`(samples, features)`. PyTorch and JAX additionally accept structured
-single-array inputs with any shape `(samples, ...)`. A baseline may be a
-scalar, one sample, or a baseline distribution with shape `(baselines, ...)`.
-Optional `baseline_weights` must align with its rows. A background object
-exposing `rows` and `weights`, including a CBaseline `Background`, may be
-passed directly. Unified IG—not individual backends—validates and normalizes
-the distribution.
+`(samples, features)`. PyTorch, JAX, and TensorFlow additionally accept
+structured single-array inputs with any shape `(samples, ...)`. A baseline may
+be a scalar, one sample, or a baseline distribution with shape
+`(baselines, ...)`. Optional `baseline_weights` must align with its rows. A
+background object exposing `rows` and `weights`, including a CBaseline
+`Background`, may be passed directly. Unified IG—not individual backends—
+validates and normalizes the distribution.
 
 Every input is attributed from the same baseline distribution. Unified IG
 averages its Integrated Gradients paths over the distribution; it never infers
@@ -88,10 +88,16 @@ estimand. Probability attribution is intentionally excluded.
 
 Generic differentiable frameworks do not encode whether a vector output is a
 class-score vector or a multi-output regression prediction. Unified IG treats
-vector-valued PyTorch and JAX outputs as class scores by default. Pass
-`output_kind="regression"` to preserve independent regression outputs without
-binary differencing or multiclass centering. Known sklearn and tree estimators
-declare their task type and do not use this option.
+vector-valued PyTorch, JAX, and TensorFlow outputs as class scores by default.
+Pass `output_kind="regression"` to preserve independent regression outputs
+without binary differencing or multiclass centering. Known sklearn and tree
+estimators declare their task type and do not use this option.
+
+Keras 3 models use their configured native automatic-gradient backend.
+Visible final sigmoid and softmax activations are rejected for classification:
+the explained output must be a logit or raw score, not a probability. An
+explicit `output_kind="regression"` permits these activations only when the
+output is genuinely a bounded regression prediction.
 
 ## Completeness
 
@@ -147,11 +153,11 @@ Numerical backends use Gauss–Legendre quadrature on the unit path interval.
 usually improve accuracy but require proportionally more gradient evaluations.
 The default is 64.
 
-PyTorch uses Captum's Gauss–Legendre implementation. JAX evaluates native
-automatic gradients at the same quadrature nodes. A JAX prediction function
-must produce samplewise outputs: one scalar or one vector for each leading
-input row. By default, two class scores are reduced to their margin and three
-or more are centered under the multiclass convention above.
+PyTorch uses Captum's Gauss–Legendre implementation. JAX and TensorFlow
+evaluate native automatic gradients at the same quadrature nodes. Prediction
+functions must produce samplewise outputs: one scalar or one vector for each
+leading input row. By default, two class scores are reduced to their margin
+and three or more are centered under the multiclass convention above.
 
 When explicitly enabled with `fallback="finite_difference"`, Unified IG uses
 central finite differences to approximate gradients for otherwise unsupported

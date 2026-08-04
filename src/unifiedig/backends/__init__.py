@@ -5,6 +5,7 @@ from .finite_difference import FiniteDifferenceBackend
 from .jax import JaxBackend
 from .pytorch import PyTorchBackend
 from .skgrad import SkgradBackend
+from .tensorflow import TensorFlowBackend
 from .treeig import TreeIGBackend
 from .treeig_numeric import TreeIGNumericBackend
 
@@ -14,6 +15,7 @@ __all__ = [
     "JaxBackend",
     "PyTorchBackend",
     "SkgradBackend",
+    "TensorFlowBackend",
     "TreeIGBackend",
     "TreeIGNumericBackend",
 ]

@@ -259,3 +259,72 @@ def normalize_jax_inputs(
         normalized_baseline[jnp.asarray(positive)],
         jnp.asarray(weight_array[positive], dtype=normalized_data.dtype),
     )
+
+
+def normalize_tensorflow_inputs(
+    data: Any,
+    baseline: Any,
+    baseline_weights: Optional[Any] = None,
+    *,
+    dtype: Any = None,
+) -> Tuple[Any, Any, Any]:
+    """Normalize TensorFlow inputs and a weighted baseline distribution."""
+
+    try:
+        import tensorflow as tf
+    except ImportError as exc:  # pragma: no cover - selected only when installed
+        raise ImportError(
+            "TensorFlow support is optional. Install it with "
+            "`pip install unifiedig[tensorflow]`."
+        ) from exc
+
+    data_source = data.to_numpy() if hasattr(data, "to_numpy") else data
+    if dtype is None:
+        source = tf.convert_to_tensor(data_source)
+        dtype = source.dtype if source.dtype.is_floating else tf.float32
+    normalized_data = tf.convert_to_tensor(data_source, dtype=dtype)
+    if normalized_data.shape.rank == 1:
+        normalized_data = tf.reshape(normalized_data, (1, -1))
+    if normalized_data.shape.rank is None or normalized_data.shape.rank < 2:
+        raise ValueError("data must contain a non-empty leading sample dimension")
+    if normalized_data.shape[0] == 0:
+        raise ValueError("data must contain a non-empty leading sample dimension")
+    if not bool(tf.reduce_all(tf.math.is_finite(normalized_data)).numpy()):
+        raise ValueError("data must contain only finite values")
+
+    baseline, baseline_weights = _baseline_parts(baseline, baseline_weights)
+    baseline_source = (
+        baseline.to_numpy() if hasattr(baseline, "to_numpy") else baseline
+    )
+    normalized_baseline = tf.convert_to_tensor(
+        baseline_source, dtype=normalized_data.dtype
+    )
+    sample_shape = tuple(normalized_data.shape[1:])
+    if normalized_baseline.shape.rank == 0:
+        normalized_baseline = tf.fill(
+            (1, *sample_shape), normalized_baseline
+        )
+    elif tuple(normalized_baseline.shape) == sample_shape:
+        normalized_baseline = normalized_baseline[None, ...]
+    elif (
+        normalized_baseline.shape.rank != normalized_data.shape.rank
+        or tuple(normalized_baseline.shape[1:]) != sample_shape
+    ):
+        raise ValueError(
+            "baseline must be scalar, have the input sample shape, or be a "
+            "baseline distribution with matching sample shape"
+        )
+    if normalized_baseline.shape[0] == 0:
+        raise ValueError("baseline distribution must contain at least one row")
+    if not bool(tf.reduce_all(tf.math.is_finite(normalized_baseline)).numpy()):
+        raise ValueError("baseline must contain only finite values")
+
+    weight_array = normalize_baseline_weights(
+        baseline_weights, n_baselines=normalized_baseline.shape[0]
+    )
+    positive = weight_array > 0
+    return (
+        normalized_data,
+        tf.boolean_mask(normalized_baseline, positive),
+        tf.convert_to_tensor(weight_array[positive], dtype=normalized_data.dtype),
+    )

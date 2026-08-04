@@ -38,24 +38,41 @@ jobs:
 
   torch:
     runs-on: ubuntu-latest
+    env:
+      KERAS_BACKEND: torch
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - run: python -m pip install --upgrade ".[test,torch]"
+      - run: python -m pip install --upgrade ".[test,torch]" keras
       - run: pytest
 
   jax:
     runs-on: ubuntu-latest
+    env:
+      KERAS_BACKEND: jax
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - run: python -m pip install --upgrade ".[test,jax]"
+      - run: python -m pip install --upgrade ".[test,jax]" keras
+      - run: pytest
+
+  tensorflow:
+    runs-on: ubuntu-latest
+    env:
+      KERAS_BACKEND: tensorflow
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade ".[test,tensorflow]"
       - run: pytest
 
   trees:

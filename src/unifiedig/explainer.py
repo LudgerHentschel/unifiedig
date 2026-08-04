@@ -12,18 +12,24 @@ from .backends import (
     JaxBackend,
     PyTorchBackend,
     SkgradBackend,
+    TensorFlowBackend,
     TreeIGBackend,
     TreeIGNumericBackend,
 )
-from .baselines import normalize_inputs, normalize_jax_inputs, normalize_torch_inputs
+from .baselines import (
+    normalize_inputs,
+    normalize_jax_inputs,
+    normalize_tensorflow_inputs,
+    normalize_torch_inputs,
+)
 from .explanation import Explanation
-
 
 _BACKENDS: Sequence[Type[Backend]] = (
     SkgradBackend,
-    TreeIGBackend,
     PyTorchBackend,
     JaxBackend,
+    TensorFlowBackend,
+    TreeIGBackend,
 )
 
 
@@ -46,12 +52,15 @@ class Explainer:
     ``probability_floor`` must be set explicitly if any path probability is
     zero. Specialized backends always take precedence.
     Differentiable JAX functions are selected explicitly by wrapping them in
-    :class:`unifiedig.JaxModel`.
+    :class:`unifiedig.JaxModel`; arbitrary TensorFlow functions use
+    :class:`unifiedig.TensorFlowModel`. TensorFlow-backed Keras models work
+    directly.
 
-    Vector-valued PyTorch and JAX outputs are treated as class scores by
+    Vector-valued automatic-gradient outputs are treated as class scores by
     default. Set ``output_kind="regression"`` for multi-output regression.
     Known sklearn and tree estimators declare their own output semantics and
-    do not need this option.
+    do not need this option. Keras 3 models use their configured TensorFlow,
+    JAX, or PyTorch backend automatically.
     """
 
     def __init__(
@@ -132,8 +141,8 @@ class Explainer:
         if backend_type is None:
             if output_kind != "auto":
                 raise ValueError(
-                    "output_kind is only needed for ambiguous PyTorch and "
-                    "JAX outputs; sklearn and tree models declare their "
+                    "output_kind is only needed for ambiguous automatic-"
+                    "gradient outputs; sklearn and tree models declare their "
                     "output semantics"
                 )
             if fallback is None:
@@ -174,15 +183,15 @@ class Explainer:
                     stacklevel=2,
                 )
         else:
-            if backend_type in (PyTorchBackend, JaxBackend):
+            if backend_type in (PyTorchBackend, JaxBackend, TensorFlowBackend):
                 self._backend = backend_type(
                     model, n_steps=n_steps, output_kind=output_kind
                 )
             else:
                 if output_kind != "auto":
                     raise ValueError(
-                        "output_kind is only needed for ambiguous PyTorch and "
-                        "JAX outputs; sklearn and tree models declare their "
+                        "output_kind is only needed for ambiguous automatic-"
+                        "gradient outputs; sklearn and tree models declare their "
                         "output semantics"
                     )
                 self._backend = backend_type(model, n_steps=n_steps)
@@ -213,6 +222,16 @@ class Explainer:
                 )
             )
             explanation_data = np.asarray(normalized_data)
+        elif input_kind == "tensorflow":
+            normalized_data, normalized_baseline, normalized_weights = (
+                normalize_tensorflow_inputs(
+                    data,
+                    self.baseline,
+                    self.baseline_weights,
+                    dtype=self._backend.dtype,
+                )
+            )
+            explanation_data = normalized_data.numpy()
         else:
             normalized_data, normalized_baseline, normalized_weights = normalize_inputs(
                 data, self.baseline, self.baseline_weights

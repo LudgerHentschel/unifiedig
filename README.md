@@ -62,7 +62,9 @@ The same public API currently covers:
 - scalar-output, multi-output regression, and class-score PyTorch modules;
 - differentiable scalar, multi-output regression, and class-score JAX
   prediction functions, including functions backed by Flax, NNX, Equinox, or
-  Haiku models; and
+  Haiku models;
+- TensorFlow models and Keras 3 models running on TensorFlow, JAX, or PyTorch;
+  and
 - other smooth sklearn regressors and decision-score classifiers through an
   explicit numerical fallback.
 
@@ -110,6 +112,7 @@ Optional capabilities are installed separately:
 | Numerical CatBoost attribution | `pip install "unifiedig[catboost]"` |
 | PyTorch attribution through Captum | `pip install "unifiedig[torch]"` |
 | JAX automatic-gradient attribution | `pip install "unifiedig[jax]"` |
+| TensorFlow and TensorFlow-backed Keras attribution | `pip install "unifiedig[tensorflow]"` |
 | Conversion to `shap.Explanation` | `pip install "unifiedig[shap]"` |
 | Prediction-neutral weighted backgrounds | `pip install cbaseline` |
 | All Unified IG backend and adapter extras | `pip install "unifiedig[all]"` |
@@ -144,6 +147,7 @@ Unified IG automatically selects the strongest available route:
 | Differentiable sklearn | Analytic Jacobians from skgrad | Gauss–Legendre quadrature | sklearn MLPs |
 | PyTorch | Automatic gradients through Captum | Gauss–Legendre quadrature | Scalar, multi-output regression, and class-score `torch.nn.Module` models |
 | JAX | Native automatic gradients | Gauss–Legendre quadrature | Differentiable scalar, multi-output regression, and class-score functions |
+| TensorFlow | Native automatic gradients | Gauss–Legendre quadrature | TensorFlow functions and TensorFlow-backed Keras models |
 | Numerical trees | TreeIG path-event detection | Approximate crossing search | CatBoost and recognized unsupported piecewise-constant trees |
 | Numerical fallback | Batched central finite differences | Gauss–Legendre quadrature | Other smooth sklearn estimators |
 
@@ -259,7 +263,7 @@ The default choices are designed to make the common case short:
 | Numerical tree search | 1,024 grid intervals plus four adaptive levels |
 | Completeness checking | Enabled |
 | Black-box numerical fallback | Disabled unless explicitly requested |
-| Vector PyTorch/JAX output | Class scores; declare `output_kind="regression"` for multi-output regression |
+| Vector automatic-gradient output | Class scores; declare `output_kind="regression"` for multi-output regression |
 
 Numerical resolution and diagnostics can be adjusted when necessary:
 
@@ -359,6 +363,7 @@ floor explicitly defines the finite score object being explained.
 | sklearn neural networks | Binary and multiclass `MLPClassifier` | Logit or centered logit vector |
 | PyTorch | `torch.nn.Module` with one scalar, multiple regression outputs, or one raw score per class | Model output or centered score vector |
 | JAX | Batched differentiable prediction function with one scalar, multiple regression outputs, or one raw score per class | Model output or centered score vector |
+| TensorFlow/Keras | Batched model with one scalar, multiple regression outputs, or one raw score per class | Model output or centered score vector |
 
 sklearn MLP hidden activations may be identity, logistic, tanh, or ReLU.
 Multi-output MLP regression is supported. A two-score PyTorch output becomes
@@ -366,10 +371,10 @@ the single margin `score[1] - score[0]`; three or more scores are centered.
 PyTorch inputs may have any single-tensor sample shape; Unified IG preserves
 the module's device, floating-point dtype, and prior training/evaluation state.
 
-Vector-valued PyTorch and JAX outputs are assumed to be class scores by
-default because the frameworks do not identify whether a generic tensor is a
-classification score vector or a multi-output regression prediction. Declare
-the latter explicitly:
+Vector-valued PyTorch, JAX, and TensorFlow outputs are assumed to be class
+scores by default because the frameworks do not identify whether a generic
+tensor is a classification score vector or a multi-output regression
+prediction. Declare the latter explicitly:
 
 ```python
 explanation = uig.Explainer(
@@ -399,6 +404,30 @@ Linen-style model, for example, can use
 `uig.JaxModel(model.apply, params=variables)`. Callable NNX and Equinox models
 can be wrapped directly. Haiku and stateful framework APIs can be exposed
 through a small inference closure.
+
+TensorFlow-backed Keras models work directly:
+
+```python
+from tensorflow import keras
+import unifiedig as uig
+
+model = keras.Sequential(
+    [keras.Input((n_features,)), keras.layers.Dense(1)]
+)
+explanation = uig.Explainer(model, background)(X_eval)
+```
+
+Keras 3 models use their configured native backend. A Keras model running on
+the JAX backend uses Unified IG's JAX gradients; one running on the PyTorch
+backend uses the PyTorch/Captum route. Arbitrary batched TensorFlow functions
+can be selected explicitly with `uig.TensorFlowModel(predict_fn)`, analogous
+to `JaxModel`.
+
+Classification models must expose logits or raw scores. Unified IG rejects a
+visible final Keras `sigmoid` or `softmax` activation instead of silently
+attributing probabilities. Construct an inference model ending at the
+pre-activation logits. If a sigmoid or softmax output genuinely represents a
+bounded multi-output regression, declare `output_kind="regression"`.
 
 ### Opt-in numerical fallback
 
@@ -504,15 +533,16 @@ model is smooth or that every individual attribution is accurate.
 
 ## Current gaps and deferred scope
 
-Notable remaining ecosystem gaps include TensorFlow/Keras and exact structural
-support for CatBoost and probability-averaging sklearn forests. The latter are
-already covered by explicit numerical path-event detection, but their feature
-allocation remains approximate.
+Notable remaining gaps include exact structural support for CatBoost and
+probability-averaging sklearn forests. These are already covered by explicit
+numerical path-event detection, but their feature allocation remains
+approximate.
 
 Also deferred:
 
 - exact piecewise-linear integration at ReLU activation boundaries;
-- multiple-input PyTorch models; and
+- multiple-input PyTorch models;
+- multiple-input or structured-output TensorFlow/Keras models; and
 - a public third-party backend registry.
 
 ## Examples
@@ -526,6 +556,7 @@ Complete examples are available for:
 - [sklearn MLP classification](examples/mlp_classification.py)
 - [PyTorch](examples/pytorch.py)
 - [JAX](examples/jax_model.py)
+- [TensorFlow/Keras](examples/tensorflow_keras.py)
 - [the numerical fallback](examples/numerical_fallback.py)
 - [numerical tree path detection](examples/numerical_tree.py)
 - [probability-only random forest classification](examples/probability_forest.py)
@@ -557,6 +588,7 @@ The stable public surface remains deliberately small:
 uig.Explainer
 uig.Explanation
 uig.JaxModel
+uig.TensorFlowModel
 uig.Explanation.contrast
 uig.Explanation.to_shap
 ```

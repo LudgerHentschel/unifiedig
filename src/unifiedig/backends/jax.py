@@ -5,6 +5,7 @@ from typing import Any, List, Literal, Optional
 
 import numpy as np
 
+from .._keras import keras_backend, keras_dtype, validate_keras_output
 from ..jax import JaxModel
 from .base import BackendResult, classification_score_result
 
@@ -16,7 +17,7 @@ class JaxBackend:
 
     @classmethod
     def supports(cls, model: object) -> bool:
-        return isinstance(model, JaxModel)
+        return isinstance(model, JaxModel) or keras_backend(model) == "jax"
 
     def __init__(
         self,
@@ -34,13 +35,20 @@ class JaxBackend:
                 "with `pip install unifiedig[jax]`."
             ) from exc
 
-        assert isinstance(model, JaxModel)
-        self.model = model
+        if isinstance(model, JaxModel):
+            validate_keras_output(model.predict_fn, output_kind)
+            self.model = model
+        else:
+            validate_keras_output(model, output_kind)
+            self.model = JaxModel(
+                lambda data: model(data, training=False),
+                dtype=keras_dtype(model),
+            )
         self._jax = jax
         self._jnp = jnp
         self.n_steps = n_steps
         self.output_kind = output_kind
-        self.dtype = self._resolve_dtype(model.dtype)
+        self.dtype = self._resolve_dtype(self.model.dtype)
         nodes, weights = np.polynomial.legendre.leggauss(n_steps)
         self._nodes = 0.5 * (nodes + 1.0)
         self._weights = 0.5 * weights

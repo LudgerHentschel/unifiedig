@@ -13,6 +13,8 @@ import unifiedig as uig
 def test_public_api_and_unsupported_model_error():
     assert uig.Explainer is not None
     assert uig.Explanation is not None
+    assert uig.JaxModel is not None
+    assert uig.TensorFlowModel is not None
     with pytest.raises(TypeError, match="no Unified IG backend"):
         uig.Explainer(DummyRegressor(), 0.0)
 
@@ -222,8 +224,8 @@ def test_multiclass_contrast_works_with_scalar_shap_plots():
 
     contrast = explanation.contrast("a", "c").to_shap()
 
-    import shap
     import matplotlib.pyplot as plt
+    import shap
 
     assert contrast.output_names == "a - c"
     shap.plots.beeswarm(contrast, show=False)
