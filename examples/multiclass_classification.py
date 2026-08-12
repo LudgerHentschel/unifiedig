@@ -3,6 +3,7 @@
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 
+from cbaseline import background
 import unifiedig as uig
 
 
@@ -14,7 +15,21 @@ latent_scores = np.column_stack(
 y = np.argmax(latent_scores, axis=1)
 model = LogisticRegression(max_iter=1000).fit(X, y)
 
-explanation = uig.Explainer(model, X[:50])(X[100:105])
+# Construct one reference distribution for the complete centered score vector.
+training_scores = model.decision_function(X)
+centered_training_scores = training_scores - training_scores.mean(
+    axis=1, keepdims=True
+)
+f0 = centered_training_scores.mean(axis=0)
+bg = background(
+    predictions=centered_training_scores,
+    f0=f0,
+    features=X,
+    weighting="calibrated",
+)
+
+# A deliberate single starting point is also valid: uig.Explainer(model, x0).
+explanation = uig.Explainer(model, bg)(X[100:105])
 
 raw_scores = model.decision_function(X[100:105])
 centered_scores = raw_scores - raw_scores.mean(axis=1, keepdims=True)

@@ -101,6 +101,7 @@ without expanding the public API.
 import numpy as np
 from sklearn.linear_model import Ridge
 
+from cbaseline import background
 import unifiedig as uig
 
 rng = np.random.default_rng(0)
@@ -108,10 +109,19 @@ X_train = rng.normal(size=(200, 4))
 y_train = 2.0 * X_train[:, 0] - X_train[:, 1] + 0.5 * X_train[:, 2]
 model = Ridge(alpha=0.5).fit(X_train, y_train)
 
-background = X_train[:50]
+# Choose a reference prediction and construct observed baseline inputs whose
+# weighted mean model prediction equals that reference.
+f_train = model.predict(X_train)
+f0 = float(f_train.mean())
+bg = background(
+    predictions=f_train,
+    f0=f0,
+    features=X_train,
+    weighting="calibrated",
+)
 X_eval = X_train[100:105]
 
-explanation = uig.Explainer(model, background)(X_eval)
+explanation = uig.Explainer(model, bg)(X_eval)
 
 np.testing.assert_allclose(
     explanation.base_values + explanation.values.sum(axis=1),
@@ -122,10 +132,19 @@ np.testing.assert_allclose(
 For a pandas `DataFrame`, Unified IG carries column labels into
 `explanation.feature_names`.
 
+If one particular input is the intended starting point, pass it directly
+instead: `uig.Explainer(model, x0)`.
+
 ## Installation
 
-The core installation includes NumPy, scikit-learn, skgrad, and the numerical
-fallback:
+The recommended workflow installs UnifiedIG together with CBaseline:
+
+```console
+pip install unifiedig cbaseline
+```
+
+The minimal core installation includes NumPy, scikit-learn, skgrad, and the
+numerical fallback:
 
 ```console
 pip install unifiedig

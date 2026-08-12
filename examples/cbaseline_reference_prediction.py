@@ -32,6 +32,7 @@ bg = background(
 )
 
 X_eval = X_train[500:505]
+# A deliberate single starting point is also valid: uig.Explainer(model, x0).
 explanation = uig.Explainer(model, bg)(X_eval)
 
 np.testing.assert_allclose(explanation.base_values, f0)

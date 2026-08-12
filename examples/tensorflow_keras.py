@@ -3,8 +3,10 @@
 import numpy as np
 from tensorflow import keras
 
+from cbaseline import background
 import unifiedig as uig
 
+keras.utils.set_random_seed(9)
 model = keras.Sequential(
     [
         keras.Input((3,)),
@@ -13,12 +15,19 @@ model = keras.Sequential(
     ]
 )
 data = np.array([[0.5, -0.2, 0.8]], dtype=np.float32)
-background = np.array(
-    [[-0.4, 0.1, 0.3], [0.2, -0.3, 0.6], [0.1, 0.4, -0.2]],
-    dtype=np.float32,
+rng = np.random.default_rng(9)
+reference = rng.normal(size=(200, 3)).astype(np.float32)
+reference_predictions = model(reference, training=False).numpy()[:, 0]
+f0 = float(reference_predictions.mean())
+bg = background(
+    predictions=reference_predictions,
+    f0=f0,
+    features=reference,
+    weighting="calibrated",
 )
 
-explanation = uig.Explainer(model, background)(data)
+# A deliberate single starting point is also valid: uig.Explainer(model, x0).
+explanation = uig.Explainer(model, bg)(data)
 
 print(explanation.values)
 print(explanation.max_abs_completeness_error)

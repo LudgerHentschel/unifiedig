@@ -3,6 +3,7 @@
 import numpy as np
 from sklearn.neural_network import MLPRegressor
 
+from cbaseline import background
 import unifiedig as uig
 
 rng = np.random.default_rng(7)
@@ -15,9 +16,16 @@ model = MLPRegressor(
     max_iter=5000,
     random_state=1,
 ).fit(training, targets)
+predictions = model.predict(training)
+f0 = float(predictions.mean())
+bg = background(
+    predictions=predictions,
+    f0=f0,
+    features=training,
+    weighting="calibrated",
+)
 
-# Use observed reference cases. UnifiedIG starts with 16 quadrature nodes and
-# refines automatically if its completeness tolerance is not met.
-explanation = uig.Explainer(model, training[:25])([[0.5, -0.2, 0.8]])
+# A deliberate single starting point is also valid: uig.Explainer(model, x0).
+explanation = uig.Explainer(model, bg)([[0.5, -0.2, 0.8]])
 print(explanation.values)
 print(explanation.max_abs_completeness_error)
