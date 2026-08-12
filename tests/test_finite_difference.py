@@ -74,7 +74,9 @@ def test_gaussian_process_fallback_uses_baseline_weights():
 def test_binary_classifier_fallback_uses_decision_scores():
     X, score = _data(seed=71)
     y = (score > np.median(score)).astype(int)
-    model = SVC(kernel="rbf", gamma=0.6, C=2.0).fit(X, y)
+    # LDA is intentionally unsupported by skgrad, so this exercises the
+    # explicit numerical fallback even as skgrad adds more analytic models.
+    model = LinearDiscriminantAnalysis().fit(X, y)
 
     with pytest.warns(RuntimeWarning, match="finite-difference gradients"):
         explainer = uig.Explainer(

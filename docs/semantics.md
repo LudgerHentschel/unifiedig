@@ -149,12 +149,29 @@ configured with `completeness_atol`, `completeness_rtol`, and
 ## Numerical integration
 
 Numerical backends use Gauss–Legendre quadrature on the unit path interval.
-`Explainer(..., n_steps=N)` controls the number of quadrature nodes. More nodes
-usually improve accuracy but require proportionally more gradient evaluations.
-The default is 64.
+When `n_steps` is omitted, Unified IG starts with 16 nodes and automatically
+retries with 32, then 64, if the completeness tolerance is not met. A successful
+higher resolution is retained by that explainer for later calls. Supplying
+`Explainer(..., n_steps=N)` disables this refinement and uses the requested
+number of nodes; disabling completeness checking also disables refinement.
 
-PyTorch uses Captum's Gauss–Legendre implementation. JAX and TensorFlow
-evaluate native automatic gradients at the same quadrature nodes. Prediction
+More nodes usually improve accuracy but require proportionally more gradient
+evaluations. For a supported degree-`d` polynomial pipeline ending in an affine
+estimator, Unified IG caps the active resolution at `ceil(d / 2)`, which is
+exact for the polynomial gradient along a straight path. An explicitly smaller
+value is not raised automatically.
+
+Scalar-output skgrad models batch baseline-observation paths before evaluating
+analytic gradients. `gradient_batch_size` bounds the number of path rows in
+each call and defaults to 8,192; it does not change the attribution functional
+or the quadrature nodes.
+
+For affine prediction functions, averaging IG over a baseline distribution is
+exactly equivalent to using its weighted mean baseline. The affine backend
+uses this identity to avoid work proportional to the number of baseline rows.
+
+PyTorch, JAX, and TensorFlow evaluate native automatic gradients at the same
+Gauss–Legendre quadrature nodes. Prediction
 functions must produce samplewise outputs: one scalar or one vector for each
 leading input row. By default, two class scores are reduced to their margin
 and three or more are centered under the multiclass convention above.

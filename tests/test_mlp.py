@@ -133,6 +133,33 @@ def test_baseline_distribution_is_shared_for_deep_mlp():
     assert result.max_abs_completeness_error < 1e-7
 
 
+def test_scalar_mlp_batches_baseline_paths_through_input_gradient(monkeypatch):
+    import unifiedig.backends.skgrad as skgrad_backend
+
+    rng = np.random.default_rng(81)
+    training = rng.normal(size=(60, 2))
+    model = MLPRegressor(
+        hidden_layer_sizes=(4, 3), activation="tanh", solver="lbfgs",
+        max_iter=5000, random_state=3,
+    ).fit(training, training[:, 0] - training[:, 1] ** 2)
+    calls = 0
+    original = skgrad_backend.skgrad.input_gradient
+
+    def counting_gradient(model, data, target=None):
+        nonlocal calls
+        calls += 1
+        return original(model, data, target=target)
+
+    monkeypatch.setattr(skgrad_backend.skgrad, "input_gradient", counting_gradient)
+    result = uig.Explainer(
+        model, training[:10], n_steps=16, gradient_batch_size=4
+    )(training[10:12])
+
+    # Two observations permit two baselines per path batch: 5 batches * 16 nodes.
+    assert calls == 80
+    assert result.max_abs_completeness_error < 1e-7
+
+
 def test_relu_completeness_warning_and_quadrature_convergence():
     model = fitted_one_neuron_mlp("relu")
     data = np.array([[1.0]])
@@ -154,6 +181,49 @@ def test_completeness_warning_can_be_disabled():
         )([[1.0]])
     assert not recorded
     assert result.max_abs_completeness_error == pytest.approx(0.5)
+
+
+def test_omitted_n_steps_refines_from_16_to_32(monkeypatch):
+    model = fitted_one_neuron_mlp("tanh")
+    explainer = uig.Explainer(model, [0.0])
+    monkeypatch.setattr(
+        type(explainer),
+        "_completeness_failed",
+        lambda self, error, output: self.n_steps < 32,
+    )
+
+    explainer([[1.0]])
+
+    assert explainer.n_steps == 32
+
+
+def test_explicit_n_steps_disables_automatic_refinement(monkeypatch):
+    model = fitted_one_neuron_mlp("tanh")
+    explainer = uig.Explainer(model, [0.0], n_steps=16)
+    monkeypatch.setattr(
+        type(explainer),
+        "_completeness_failed",
+        lambda self, error, output: True,
+    )
+
+    with pytest.warns(RuntimeWarning, match="completeness tolerance"):
+        explainer([[1.0]])
+
+    assert explainer.n_steps == 16
+
+
+def test_disabling_completeness_disables_automatic_refinement(monkeypatch):
+    model = fitted_one_neuron_mlp("tanh")
+    explainer = uig.Explainer(model, [0.0], check_completeness=False)
+    monkeypatch.setattr(
+        type(explainer),
+        "_completeness_failed",
+        lambda self, error, output: True,
+    )
+
+    explainer([[1.0]])
+
+    assert explainer.n_steps == 16
 
 
 def test_multiclass_mlp_classifier_uses_centered_logits():
@@ -196,6 +266,14 @@ def test_invalid_n_steps_is_rejected(n_steps):
     )
     with pytest.raises(ValueError, match="positive integer"):
         uig.Explainer(model, [0.0], n_steps=n_steps)
+
+
+@pytest.mark.parametrize("batch_size", [0, -1, 1.5, True])
+def test_invalid_gradient_batch_size_is_rejected(batch_size):
+    with pytest.raises(ValueError, match="gradient_batch_size"):
+        uig.Explainer(
+            fitted_one_neuron_mlp(), [0.0], gradient_batch_size=batch_size
+        )
 
 
 @pytest.mark.parametrize("name", ["completeness_atol", "completeness_rtol"])

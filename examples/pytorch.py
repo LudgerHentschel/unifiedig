@@ -1,4 +1,4 @@
-"""Explain a raw scalar output from a PyTorch module through Captum."""
+"""Explain a raw scalar output from a PyTorch module through native autograd."""
 
 import torch
 

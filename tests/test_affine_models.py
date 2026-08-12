@@ -100,4 +100,23 @@ def test_constant_jacobian_fast_path_ignores_quadrature_count(monkeypatch):
     monkeypatch.setattr(skgrad_backend.skgrad, "input_jacobian", counting_jacobian)
     uig.Explainer(model, training[10:13], n_steps=128)(training[:5])
 
-    assert calls == 3
+    assert calls == 1
+
+
+def test_affine_distribution_collapses_to_weighted_mean():
+    training, target = _data()
+    model = Ridge(alpha=0.7).fit(training, target)
+    data = training[:5]
+    baselines = training[10:14]
+    weights = np.array([0.1, 0.2, 0.3, 0.4])
+    mean_baseline = weights @ baselines
+
+    result = uig.Explainer(
+        model, baselines, baseline_weights=weights, n_steps=128
+    )(data)
+    expected = (data - mean_baseline) * model.coef_[None, :]
+
+    np.testing.assert_allclose(result.values, expected, atol=1e-12)
+    np.testing.assert_allclose(
+        result.base_values, model.predict(mean_baseline[None, :])[0], atol=1e-12
+    )

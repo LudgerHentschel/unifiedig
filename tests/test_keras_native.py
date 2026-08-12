@@ -14,8 +14,6 @@ if keras_available:
 
 def test_keras_uses_its_configured_native_autodiff_backend():
     backend = keras.config.backend()
-    if backend == "torch" and importlib.util.find_spec("captum") is None:
-        pytest.skip("captum is not installed")
     if backend not in {"jax", "torch"}:
         pytest.skip("this test exercises the Keras JAX and Torch backends")
 
@@ -48,8 +46,6 @@ def test_keras_uses_its_configured_native_autodiff_backend():
 
 def test_native_keras_probability_head_is_rejected():
     backend = keras.config.backend()
-    if backend == "torch" and importlib.util.find_spec("captum") is None:
-        pytest.skip("captum is not installed")
     if backend not in {"jax", "torch"}:
         pytest.skip("TensorFlow probability heads are tested separately")
     model = keras.Sequential(

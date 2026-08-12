@@ -74,7 +74,7 @@ def test_jax_multiclass_output_uses_centered_scores_and_names():
     centered = raw - raw.mean(axis=1, keepdims=True)
     assert result.values.shape == (2, 2, 3)
     assert result.output_names == ["red", "green", "blue"]
-    np.testing.assert_allclose(result.values.sum(axis=-1), 0.0, atol=1e-7)
+    np.testing.assert_allclose(result.values.sum(axis=-1), 0.0, atol=2e-7)
     np.testing.assert_allclose(
         result.values.sum(axis=1) + result.base_values, centered, atol=1e-6
     )

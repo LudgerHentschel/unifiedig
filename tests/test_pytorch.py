@@ -1,5 +1,3 @@
-import builtins
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -8,7 +6,6 @@ import unifiedig as uig
 
 
 torch = pytest.importorskip("torch")
-pytest.importorskip("captum")
 
 
 def test_torch_linear_regression_is_complete_and_numpy_backed():
@@ -72,6 +69,31 @@ def test_torch_weighted_baseline_distribution():
         result.values.sum(axis=1) + result.base_values,
         model(data).detach().numpy()[:, 0],
         atol=1e-8,
+    )
+
+
+def test_torch_gradient_batch_size_does_not_change_attributions():
+    torch.manual_seed(82)
+    model = torch.nn.Sequential(
+        torch.nn.Linear(2, 5), torch.nn.Tanh(), torch.nn.Linear(5, 1)
+    ).double()
+    data = torch.tensor([[0.4, -0.2], [-0.5, 0.7]], dtype=torch.float64)
+    baselines = torch.randn(7, 2, dtype=torch.float64)
+    weights = torch.rand(7, dtype=torch.float64)
+    weights /= weights.sum()
+
+    one_at_a_time = uig.Explainer(
+        model, baselines, baseline_weights=weights,
+        n_steps=32, gradient_batch_size=len(data),
+    )(data)
+    one_batch = uig.Explainer(
+        model, baselines, baseline_weights=weights,
+        n_steps=32, gradient_batch_size=10_000,
+    )(data)
+
+    np.testing.assert_allclose(one_batch.values, one_at_a_time.values, atol=1e-12)
+    np.testing.assert_allclose(
+        one_batch.base_values, one_at_a_time.base_values, atol=1e-12
     )
 
 
@@ -190,16 +212,3 @@ def test_multi_output_torch_regression_is_not_centered_when_declared():
         model(data).detach().numpy(),
         atol=1e-8,
     )
-
-
-def test_missing_captum_error_is_actionable(monkeypatch):
-    real_import = builtins.__import__
-
-    def without_captum(name, *args, **kwargs):
-        if name.startswith("captum"):
-            raise ImportError
-        return real_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", without_captum)
-    with pytest.raises(ImportError, match=r"unifiedig\[torch\]"):
-        uig.Explainer(torch.nn.Linear(1, 1), [0.0])

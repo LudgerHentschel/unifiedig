@@ -8,6 +8,8 @@
 **Integrated Gradients prediction attribution for a broad range of Python
 machine-learning models, through one interface.**
 
+> **UnifiedIG customizes the solver, not the estimand.**
+
 Give Unified IG a fitted model and a reference background. Unified IG selects
 the appropriate implementation and returns one consistent explanation object.
 
@@ -20,6 +22,19 @@ explanation = explainer(X)
 
 That is the standard user experience. There are no model-specific explainer
 classes to choose and no gradient backend to configure.
+
+Across linear models, polynomial pipelines, neural networks, and trees, the
+attribution definition and baseline semantics stay fixed. UnifiedIG changes
+only the internal calculation used to make that definition fast and accurate.
+
+Use UnifiedIG when you want:
+
+- one attribution methodology across different fitted model classes;
+- an explicit single baseline or shared weighted baseline distribution;
+- exact structural shortcuts and native gradients where they are available;
+- automatic numerical accuracy checks without model-specific configuration;
+  and
+- a small API whose returned values can still use SHAP's plotting ecosystem.
 
 The result contains feature attributions, baseline values, input data, labels,
 and a completeness diagnostic:
@@ -68,6 +83,18 @@ The same public API currently covers:
 - other smooth sklearn regressors and decision-score classifiers through an
   explicit numerical fallback.
 
+## Documentation
+
+- [How UnifiedIG works](docs/how-it-works.md): the fixed attribution
+  functional, specialized solvers, numerical accuracy, performance design,
+  and relationship to SHAP.
+- [Explanation semantics](docs/semantics.md): baseline distributions, output
+  scales, multiclass conventions, array shapes, and completeness.
+- [Roadmap](docs/roadmap.md): implemented capabilities and deferred scope.
+
+The README introduces normal use. The linked documents explain the machinery
+without expanding the public API.
+
 ## Quick start
 
 ```python
@@ -110,7 +137,7 @@ Optional capabilities are installed separately:
 |---|---|
 | Exact sklearn, XGBoost, and LightGBM tree attribution | `pip install "unifiedig[trees]"` |
 | Numerical CatBoost attribution | `pip install "unifiedig[catboost]"` |
-| PyTorch attribution through Captum | `pip install "unifiedig[torch]"` |
+| PyTorch attribution through native autograd | `pip install "unifiedig[torch]"` |
 | JAX automatic-gradient attribution | `pip install "unifiedig[jax]"` |
 | TensorFlow and TensorFlow-backed Keras attribution | `pip install "unifiedig[tensorflow]"` |
 | Conversion to `shap.Explanation` | `pip install "unifiedig[shap]"` |
@@ -145,7 +172,7 @@ Unified IG automatically selects the strongest available route:
 | Exact affine | Constant analytic Jacobian from skgrad | Closed form | Linear and regularized linear models |
 | Exact trees | TreeIG split-boundary traces | Exact | Supported sklearn, XGBoost, and LightGBM trees |
 | Differentiable sklearn | Analytic Jacobians from skgrad | Gauss–Legendre quadrature | sklearn MLPs |
-| PyTorch | Automatic gradients through Captum | Gauss–Legendre quadrature | Scalar, multi-output regression, and class-score `torch.nn.Module` models |
+| PyTorch | Native automatic gradients | Gauss–Legendre quadrature | Scalar, multi-output regression, and class-score `torch.nn.Module` models |
 | JAX | Native automatic gradients | Gauss–Legendre quadrature | Differentiable scalar, multi-output regression, and class-score functions |
 | TensorFlow | Native automatic gradients | Gauss–Legendre quadrature | TensorFlow functions and TensorFlow-backed Keras models |
 | Numerical trees | TreeIG path-event detection | Approximate crossing search | CatBoost and recognized unsupported piecewise-constant trees |
@@ -154,6 +181,11 @@ Unified IG automatically selects the strongest available route:
 Specialized routes always take precedence over the fallback. Users get exact
 or high-quality gradients when the model makes them available, without having
 to identify the backend themselves.
+
+This is the central design boundary: model-specific code may accelerate the
+calculation, but it does not select a different path, background construction,
+or attribution game. See [How UnifiedIG works](docs/how-it-works.md) for the
+full methodology and performance discussion.
 
 ## Baselines and CBaseline
 
@@ -259,7 +291,7 @@ The default choices are designed to make the common case short:
 | Probability attribution | Not offered |
 | Baseline matrix | Shared distribution; equally weighted unless weights are supplied |
 | Path | Straight line from each baseline to each input |
-| Numerical integration | 64-point Gauss–Legendre quadrature |
+| Numerical integration | 16-point Gauss–Legendre, automatically refined to 32 or 64 when needed |
 | Numerical tree search | 1,024 grid intervals plus four adaptive levels |
 | Completeness checking | Enabled |
 | Black-box numerical fallback | Disabled unless explicitly requested |
@@ -272,13 +304,27 @@ explainer = uig.Explainer(
     model,
     background,
     n_steps=128,
+    gradient_batch_size=8192,
     completeness_atol=1e-6,
     completeness_rtol=1e-4,
     check_completeness=True,
 )
 ```
 
-Exact affine and tree routes ignore `n_steps`.
+Exact affine and tree routes ignore `n_steps`. Polynomial pipelines ending in
+an affine estimator automatically cap excessive quadrature: a degree-`d`
+pipeline needs only `ceil(d / 2)` Gauss–Legendre nodes. A smaller explicitly
+requested `n_steps` remains unchanged.
+
+When `n_steps` is omitted, numerical gradient backends start with 16 nodes and
+retry with 32, then 64, only when the completeness tolerance is not met. The
+successful resolution is retained by the explainer for later calls. Supplying
+any integer disables this automatic refinement and uses that requested limit;
+disabling completeness checking also disables refinement.
+
+For scalar-output skgrad models, `gradient_batch_size` bounds the number of
+baseline-observation path rows processed in one analytic-gradient call. Larger
+batches can improve dense MLP throughput at the cost of temporary memory.
 
 ## Detailed current coverage
 
@@ -419,7 +465,7 @@ explanation = uig.Explainer(model, background)(X_eval)
 
 Keras 3 models use their configured native backend. A Keras model running on
 the JAX backend uses Unified IG's JAX gradients; one running on the PyTorch
-backend uses the PyTorch/Captum route. Arbitrary batched TensorFlow functions
+backend uses the native PyTorch route. Arbitrary batched TensorFlow functions
 can be selected explicitly with `uig.TensorFlowModel(predict_fn)`, analogous
 to `JaxModel`.
 
@@ -526,10 +572,19 @@ Exact backends generally reach floating-point precision. Quadrature and finite
 differences are approximate. Unified IG emits a `RuntimeWarning` when the
 completeness residual exceeds the configured tolerance.
 
+The check uses the mixed absolute-relative bound
+`completeness_atol + completeness_rtol * abs(model_output)`. The displayed
+`max_abs_completeness_error` is the largest absolute residual; it is not itself
+a normalized error measure.
+
 Increasing `n_steps` usually reduces quadrature error. For the numerical
 fallback, `finite_difference_step` may also matter. A small completeness
 residual is an important diagnostic, but it does not prove that an arbitrary
 model is smooth or that every individual attribution is accurate.
+
+For affine models, a weighted baseline distribution is collapsed exactly to
+its weighted mean. Polynomial and other nonlinear models retain the complete
+baseline distribution.
 
 ## Current gaps and deferred scope
 
