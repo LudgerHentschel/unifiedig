@@ -2,6 +2,9 @@
 
 ## 0.1.1.dev1
 
+- Replace the Captum runtime route with native PyTorch autograd, preserving
+  weighted baseline distributions, Gauss--Legendre IG, bounded batching,
+  output semantics, completeness diagnostics, and model state restoration.
 - Add TensorFlow automatic-gradient attribution and direct TensorFlow-backed
   Keras model dispatch through the optional `tensorflow` extra.
 - Route Keras 3 models through their configured TensorFlow, JAX, or PyTorch
