@@ -53,6 +53,17 @@ The baseline distribution is therefore part of the estimand, not a tuning
 sample used only by a particular backend. Passing the same distribution to
 different supported model classes preserves the same reference semantics.
 
+In most tabular applications, a distribution of observed reference cases is a
+better default than an arbitrary zero vector. Zero is appropriate only when it
+has a substantive interpretation on the input scale.
+
+Sometimes the intended reference is specified in prediction space as `f0`
+rather than as input rows. Because many inputs can share the same prediction,
+there is no unique inverse from `f0` to a feature baseline. UnifiedIG does not
+invent one. CBaseline constructs a weighted distribution of observed inputs
+whose mean model prediction equals `f0`; that object can be passed directly to
+`uig.Explainer`.
+
 ## What remains fixed
 
 UnifiedIG keeps the following choices invariant across model families:

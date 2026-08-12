@@ -190,8 +190,12 @@ full methodology and performance discussion.
 ## Baselines and CBaseline
 
 The baseline defines the reference prediction from which the explanation
-starts. Unified IG accepts one baseline observation or a shared baseline
-distribution. Matrix rows receive equal weight by default:
+starts. In most tabular applications, prefer a shared distribution of observed
+reference cases over an arbitrary all-zero input. A zero baseline is
+appropriate only when zero itself represents the intended comparison.
+
+Unified IG accepts one baseline observation or a shared baseline distribution.
+Matrix rows receive equal weight by default:
 
 ```python
 background = X_train[:100]
@@ -215,8 +219,16 @@ explanation = uig.Explainer(
 Weights must be finite, nonnegative, and aligned with the background rows.
 Unified IG normalizes them to sum to one.
 
-For a principled prediction-neutral reference distribution, use
-[CBaseline](https://pypi.org/project/cbaseline/):
+### Constructing baselines from a reference prediction
+
+Often the natural starting point is a prediction `f0`, not a particular input
+row. For example, `f0` may be the model's unconditional mean prediction or a
+classification decision threshold.
+
+A prediction does not identify a unique input baseline. UnifiedIG therefore
+does not silently invert `f0` into a synthetic feature vector. Use
+[CBaseline](https://pypi.org/project/cbaseline/) to construct an empirical,
+prediction-neutral baseline distribution:
 
 ```python
 from cbaseline import background
@@ -237,6 +249,13 @@ without requiring CBaseline as a core dependency. Equal, kernel-weighted, and
 calibrated backgrounds therefore use the same explainer call. This produces
 attributions relative to the constructed reference distribution while keeping
 the background supported by observed data.
+
+Together, CBaseline and UnifiedIG separate two questions cleanly:
+
+1. CBaseline constructs the observed reference distribution that represents
+   the desired prediction `f0`.
+2. UnifiedIG attributes `f(x) - f0` using the same path functional for every
+   supported model class.
 
 For multiclass classification, construct one background for the complete
 centered score vector:
@@ -604,6 +623,7 @@ Also deferred:
 
 Complete examples are available for:
 
+- [a CBaseline reference prediction](examples/cbaseline_reference_prediction.py)
 - [linear regression](examples/linear_regression.py)
 - [binary logistic regression](examples/logistic_regression.py)
 - [multiclass classification](examples/multiclass_classification.py)

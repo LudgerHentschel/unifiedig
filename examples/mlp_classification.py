@@ -12,6 +12,6 @@ model = MLPClassifier(
     hidden_layer_sizes=(5,), activation="tanh", solver="lbfgs", random_state=4
 ).fit(training, labels)
 
-explanation = uig.Explainer(model, baseline=np.zeros(2))([[0.3, -0.2]])
+explanation = uig.Explainer(model, training[:25])([[0.3, -0.2]])
 print(explanation.values)
 print(explanation.output_names)

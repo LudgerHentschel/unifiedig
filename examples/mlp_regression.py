@@ -16,8 +16,8 @@ model = MLPRegressor(
     random_state=1,
 ).fit(training, targets)
 
-explanation = uig.Explainer(model, baseline=np.zeros(3), n_steps=64)(
-    [[0.5, -0.2, 0.8]]
-)
+# Use observed reference cases. UnifiedIG starts with 16 quadrature nodes and
+# refines automatically if its completeness tolerance is not met.
+explanation = uig.Explainer(model, training[:25])([[0.5, -0.2, 0.8]])
 print(explanation.values)
 print(explanation.max_abs_completeness_error)
