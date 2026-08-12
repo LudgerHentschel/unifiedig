@@ -8,6 +8,10 @@ from typing import Any, Callable, Mapping, Optional, Sequence
 class JaxModel:
     """Describe a JAX prediction function for :class:`unifiedig.Explainer`.
 
+    This is a lightweight calling-convention adapter. It stores references to
+    the supplied function and parameters; it does not convert, copy, train, or
+    otherwise modify a model.
+
     ``predict_fn`` is called as ``predict_fn(X, **call_kwargs)`` when
     ``params`` is omitted and as ``predict_fn(params, X, **call_kwargs)``
     otherwise. It must return one scalar or one output vector per sample.

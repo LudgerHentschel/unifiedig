@@ -28,9 +28,16 @@ bg = background(
 )
 X_eval = np.array([[0.5, -0.2], [1.0, 0.4]], dtype=np.float32)
 
-model = uig.JaxModel(predict, params=params)
-# A deliberate single starting point is also valid: uig.Explainer(model, x0).
-explanation = uig.Explainer(model, bg)(X_eval)
+# JAX has no single fitted-model protocol: prediction functions may keep their
+# parameters in a separate pytree, capture them in a closure, or belong to a
+# framework such as Flax or Equinox. JaxModel is a lightweight adapter that
+# records how UnifiedIG should call the function. It does not convert, copy,
+# train, or otherwise modify the model or its parameters.
+jax_model = uig.JaxModel(predict, params=params)
+
+# A deliberate single starting point is also valid:
+# uig.Explainer(jax_model, x0).
+explanation = uig.Explainer(jax_model, bg)(X_eval)
 
 print(explanation.values)
 print(explanation.max_abs_completeness_error)

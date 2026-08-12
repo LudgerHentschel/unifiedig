@@ -108,6 +108,14 @@ Backend classes are private implementation details. Users do not choose an
 "IG for trees" or an "IG for neural networks." They choose Integrated
 Gradients, and UnifiedIG selects an implementation.
 
+`JaxModel` and `TensorFlowModel` are public call adapters, not alternative
+attribution methods. JAX and arbitrary TensorFlow functions do not expose one
+standard fitted-model interface from which UnifiedIG can reliably infer how to
+pass parameters, vectorize observations, or name outputs. The adapters record
+that calling convention while leaving the prediction function and parameters
+unchanged. Once adapted, these models use the same `Explainer` and attribution
+functional as every other supported model.
+
 ## Why the specialized routes are fast
 
 ### Affine models

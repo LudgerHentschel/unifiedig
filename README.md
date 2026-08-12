@@ -471,23 +471,44 @@ explanation = uig.Explainer(
 Known sklearn and tree estimators expose their task type, so `output_kind` is
 unnecessary and rejected for those models.
 
-JAX functions are wrapped explicitly so Unified IG never guesses whether an
+JAX has no single fitted-model protocol. A prediction function may receive a
+parameter pytree explicitly, capture parameters in a closure, or come from a
+library such as Flax, NNX, Equinox, or Haiku. `JaxModel` is a lightweight
+adapter that records how UnifiedIG should call that function. It does not
+convert, copy, train, or modify the underlying model or parameters.
+
+The explicit adapter also prevents UnifiedIG from guessing whether an
 arbitrary Python callable is JAX-compatible:
 
 ```python
 import unifiedig as uig
 
-model = uig.JaxModel(predict_fn, params=params)
-explanation = uig.Explainer(model, background)(X_eval)
+jax_model = uig.JaxModel(predict_fn, params=params)
+explanation = uig.Explainer(jax_model, background)(X_eval)
 ```
 
 If parameters are captured in a closure, omit `params`. Functions that accept
 one sample instead of a batch use `vectorize=True`. Optional `call_kwargs`,
-`output_names`, and `dtype` make inference behavior explicit. A Flax
-Linen-style model, for example, can use
-`uig.JaxModel(model.apply, params=variables)`. Callable NNX and Equinox models
-can be wrapped directly. Haiku and stateful framework APIs can be exposed
-through a small inference closure.
+`output_names`, and `dtype` make inference behavior explicit.
+
+Common patterns are:
+
+```python
+# Explicit parameter pytree
+jax_model = uig.JaxModel(predict_fn, params=params)
+
+# Parameters captured by a closure
+jax_model = uig.JaxModel(lambda X: predict_fn(params, X))
+
+# Flax Linen apply function and variables
+jax_model = uig.JaxModel(flax_model.apply, params=variables)
+
+# A function written for one observation rather than a batch
+jax_model = uig.JaxModel(single_sample_predict, params=params, vectorize=True)
+```
+
+Callable NNX and Equinox models can be wrapped directly. Haiku and stateful
+framework APIs can be exposed through a small inference closure.
 
 TensorFlow-backed Keras models work directly:
 
