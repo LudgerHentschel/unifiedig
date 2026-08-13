@@ -162,7 +162,7 @@ evaluation input $x$.
 For feature $`j`$,
 
 ```math
-\operatorname{IG}_j(x; x_0)
+IG_j(x; x_0)
 = (x_j-x_{0,j})
   \int_0^1
   \frac{\partial f\!\left(x_0+t(x-x_0)\right)}
