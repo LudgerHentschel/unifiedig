@@ -705,5 +705,5 @@ Model-family backends are private implementation details.
   Integrated Gradients calculations for tree-based models.
 - [CBaseline](https://github.com/lhentschel/cbaseline) constructs empirical,
   prediction-neutral baseline distributions for feature attribution.
-- [skgrad](https://github.com/LudgerHentschel/skgrad) provides analytical input
+- [SKGrad](https://github.com/LudgerHentschel/skgrad) provides analytical input
   gradients and model-output utilities for supported scikit-learn estimators.
