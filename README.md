@@ -165,9 +165,9 @@ For feature $`j`$,
 IG_j(x; x_0)
 = (x_j-x_{0,j})
   \int_0^1
-  \frac{\partial f\!\left(x_0+t(x-x_0)\right)}
+  \frac{\partial f \left(x_0+t(x-x_0)\right)}
        {\partial x_j}
-  \,\mathrm{d}t
+  \,dt
 ```
   
 The attribution mechanism does not change across models. What changes is how
@@ -412,7 +412,7 @@ interval whose endpoints have identical outputs.
 For `DecisionTreeClassifier`, `RandomForestClassifier`, and
 `ExtraTreesClassifier`, which expose probabilities but no native score,
 Unified IG transforms the complete model probability vector. Binary models use
-$\log(p_1) - log(p_0)$. Multiclass models use
+$\log(p_1) - \log(p_0)$. Multiclass models use
 $\log(p_k) - \textrm{mean}(\log(p))$, retaining all $K$ centered coordinates. This is a transformation of the forest probability after aggregation, not a sum of separately transformed tree outputs.
 
 This transformation uses the canonical score vector implied by the complete
@@ -698,3 +698,12 @@ uig.Explanation.to_shap
 ```
 
 Model-family backends are private implementation details.
+
+## Supporting packages
+
+- [TreeIG](https://github.com/lhentschel/treeig) provides exact and numerical
+  Integrated Gradients calculations for tree-based models.
+- [CBaseline](https://github.com/lhentschel/cbaseline) constructs empirical,
+  prediction-neutral baseline distributions for feature attribution.
+- [skgrad](https://github.com/LudgerHentschel/skgrad) provides analytical input
+  gradients and model-output utilities for supported scikit-learn estimators.
