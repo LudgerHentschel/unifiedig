@@ -137,30 +137,26 @@ instead: `uig.Explainer(model, x0)`.
 
 ## Installation
 
-The recommended workflow installs UnifiedIG together with CBaseline:
-
-```console
-pip install unifiedig cbaseline
-```
-
-The minimal core installation includes NumPy, scikit-learn, skgrad, and the
-numerical fallback:
+Install UnifiedIG with pip:
 
 ```console
 pip install unifiedig
 ```
 
+This installs NumPy and scikit-learn together with UnifiedIG's lightweight
+supporting packages: CBaseline for constructing baseline distributions,
+skgrad for supported scikit-learn gradients, and TreeIG for tree-model
+attribution. No separate installation of these supporting packages is needed.
+
 Optional capabilities are installed separately:
 
 | Capability | Installation |
 |---|---|
-| Exact sklearn, XGBoost, and LightGBM tree attribution | `pip install "unifiedig[trees]"` |
 | Numerical CatBoost attribution | `pip install "unifiedig[catboost]"` |
 | PyTorch attribution through native autograd | `pip install "unifiedig[torch]"` |
 | JAX automatic-gradient attribution | `pip install "unifiedig[jax]"` |
 | TensorFlow and TensorFlow-backed Keras attribution | `pip install "unifiedig[tensorflow]"` |
 | Conversion to `shap.Explanation` | `pip install "unifiedig[shap]"` |
-| Prediction-neutral weighted backgrounds | `pip install cbaseline` |
 | All Unified IG backend and adapter extras | `pip install "unifiedig[all]"` |
 
 XGBoost and LightGBM models also require their respective model packages.
