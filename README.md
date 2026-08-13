@@ -148,32 +148,22 @@ supporting packages: CBaseline for constructing baseline distributions,
 skgrad for supported scikit-learn gradients, and TreeIG for tree-model
 attribution. No separate installation of these supporting packages is needed.
 
-Optional capabilities are installed separately:
-
-| Capability | Installation |
-|---|---|
-| Numerical CatBoost attribution | `pip install "unifiedig[catboost]"` |
-| PyTorch attribution through native autograd | `pip install "unifiedig[torch]"` |
-| JAX automatic-gradient attribution | `pip install "unifiedig[jax]"` |
-| TensorFlow and TensorFlow-backed Keras attribution | `pip install "unifiedig[tensorflow]"` |
-| Conversion to `shap.Explanation` | `pip install "unifiedig[shap]"` |
-| All Unified IG backend and adapter extras | `pip install "unifiedig[all]"` |
-
-XGBoost and LightGBM models also require their respective model packages.
+UnifiedIG includes adapters for supported third-party frameworks but does not
+install those frameworks automatically. Users working with PyTorch, JAX,
+TensorFlow, CatBoost, XGBoost, LightGBM, or SHAP should install and manage the
+corresponding packages through their normal framework-specific workflow.
 
 ## One attribution mechanism
 
 Unified IG computes the same quantity for every model family: Integrated
-Gradients along the straight-line path from a baseline input `x0` to an
-evaluation input `x`.
+Gradients along the straight-line path from a baseline input $x_0$ to an
+evaluation input $x$.
 
-For feature `j`,
-
-```text
-IG_j(x; x0) = (x_j - x0_j)
-               * integral from 0 to 1 of
-                 d f(x0 + t(x - x0)) / d x_j dt
-```
+For feature $j$,
+$$
+IG_j(x; x0) = (x_j - x_{0,j})
+               \int_0^1 \frac{d f(x_0 + t(x - x_0))}{d x_j} dt
+$$
 
 The attribution mechanism does not change across models. What changes is how
 Unified IG obtains the path information efficiently and accurately.
@@ -236,12 +226,12 @@ Unified IG normalizes them to sum to one.
 
 ### Constructing baselines from a reference prediction
 
-Often the natural starting point is a prediction `f0`, not a particular input
-row. For example, `f0` may be the model's unconditional mean prediction or a
+Often the natural starting point is a prediction $f_0$, not a particular input
+row. For example, $f_0$ may be the model's unconditional mean prediction or a
 classification decision threshold.
 
 A prediction does not identify a unique input baseline. UnifiedIG therefore
-does not silently invert `f0` into a synthetic feature vector. Use
+does not silently invert $f_0$ into a synthetic feature vector. Use
 [CBaseline](https://pypi.org/project/cbaseline/) to construct an empirical,
 prediction-neutral baseline distribution:
 
@@ -268,8 +258,8 @@ the background supported by observed data.
 Together, CBaseline and UnifiedIG separate two questions cleanly:
 
 1. CBaseline constructs the observed reference distribution that represents
-   the desired prediction `f0`.
-2. UnifiedIG attributes `f(x) - f0` using the same path functional for every
+   the desired prediction $f_0$.
+2. UnifiedIG attributes $f(x) - f_0$ using the same path functional for every
    supported model class.
 
 For multiclass classification, construct one background for the complete
@@ -290,7 +280,7 @@ explanation = uig.Explainer(model, bg)(X_eval)
 ```
 
 CBaseline detects the redundant common-score direction and constructs the
-background in the effective `K - 1` dimensional score space.
+background in the effective $K - 1$ dimensional score space.
 
 ## Why Integrated Gradients rather than SHAP attribution?
 
@@ -346,8 +336,8 @@ explainer = uig.Explainer(
 ```
 
 Exact affine and tree routes ignore `n_steps`. Polynomial pipelines ending in
-an affine estimator automatically cap excessive quadrature: a degree-`d`
-pipeline needs only `ceil(d / 2)` Gauss–Legendre nodes. A smaller explicitly
+an affine estimator automatically cap excessive quadrature: a degree-$d$
+pipeline needs only $\textrm{ceil}(d / 2)$ Gauss–Legendre nodes. A smaller explicitly
 requested `n_steps` remains unchanged.
 
 When `n_steps` is omitted, numerical gradient backends start with 16 nodes and
@@ -417,10 +407,8 @@ interval whose endpoints have identical outputs.
 For `DecisionTreeClassifier`, `RandomForestClassifier`, and
 `ExtraTreesClassifier`, which expose probabilities but no native score,
 Unified IG transforms the complete model probability vector. Binary models use
-`log(p1) - log(p0)`. Multiclass models use
-`log(p_k) - mean(log(p))`, retaining all `K` centered coordinates. This is a
-transformation of the forest probability after aggregation, not a sum of
-separately transformed tree outputs.
+$\log(p_1) - log(p_0)$. Multiclass models use
+$\log(p_k) - \textrm{mean}(\log(p))$, retaining all $K$ centered coordinates. This is a transformation of the forest probability after aggregation, not a sum of separately transformed tree outputs.
 
 This transformation uses the canonical score vector implied by the complete
 probability vector: applying softmax to the centered log scores recovers the
@@ -580,13 +568,13 @@ explanation.base_values + explanation.values.sum(over features)
 For regression, the explained output is the prediction. For binary
 classification, it is the positive-class decision score, logit, or raw margin.
 
-For a `K`-class model with raw scores `z`, Unified IG explains
+For a $K$-class model with raw scores $z$, Unified IG explains
 
 ```text
 centered_scores = z - mean(z over classes)
 ```
 
-The result stores `K` labeled outputs with only `K - 1` effective dimensions:
+The result stores $K$ labeled outputs with only $K - 1$ effective dimensions:
 
 ```text
 explanation.values.shape = (samples, features, classes)
