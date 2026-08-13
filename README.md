@@ -159,11 +159,17 @@ Unified IG computes the same quantity for every model family: Integrated
 Gradients along the straight-line path from a baseline input $x_0$ to an
 evaluation input $x$.
 
-For feature $j$,
-$$
-IG_j(x; x0) = (x_j - x_{0,j}) \int_0^1 \frac{d f(x_0 + t(x - x_0))}{d x_j} dt
-$$
+For feature $`j`$,
 
+```math
+\operatorname{IG}_j(x; x_0)
+= (x_j-x_{0,j})
+  \int_0^1
+  \frac{\partial f\!\left(x_0+t(x-x_0)\right)}
+       {\partial x_j}
+  \,\mathrm{d}t
+```
+  
 The attribution mechanism does not change across models. What changes is how
 Unified IG obtains the path information efficiently and accurately.
 
