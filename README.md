@@ -161,8 +161,7 @@ evaluation input $x$.
 
 For feature $j$,
 $$
-IG_j(x; x0) = (x_j - x_{0,j})
-               \int_0^1 \frac{d f(x_0 + t(x - x_0))}{d x_j} dt
+IG_j(x; x0) = (x_j - x_{0,j}) \int_0^1 \frac{d f(x_0 + t(x - x_0))}{d x_j} dt
 $$
 
 The attribution mechanism does not change across models. What changes is how
