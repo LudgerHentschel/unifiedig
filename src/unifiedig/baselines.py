@@ -57,7 +57,7 @@ def _baseline_parts(
     if has_rows:
         if baseline_weights is not None:
             raise ValueError(
-                "baseline_weights must be omitted when baseline supplies weights"
+                "Omit baseline_weights when baseline supplies weights"
             )
         return baseline.rows, baseline.weights
     return baseline, baseline_weights
@@ -72,12 +72,12 @@ def normalize_baseline_weights(
         return np.full(n_baselines, 1.0 / n_baselines, dtype=float)
     array = np.asarray(weights, dtype=float)
     if array.ndim != 1 or array.shape[0] != n_baselines:
-        raise ValueError("baseline_weights must align with baseline rows")
+        raise ValueError("baseline_weights must match baseline rows")
     if not np.isfinite(array).all() or np.any(array < 0):
         raise ValueError("baseline_weights must be finite and nonnegative")
     total = float(array.sum())
     if total <= 0:
-        raise ValueError("baseline_weights must have a positive sum")
+        raise ValueError("Sum of baseline_weights must be positive sum")
     return np.ascontiguousarray(array / total)
 
 

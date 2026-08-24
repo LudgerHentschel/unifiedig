@@ -48,8 +48,8 @@ class PyTorchBackend:
         self.dtype = reference.dtype if reference is not None else None
         self.output_kind = output_kind
         nodes, weights = np.polynomial.legendre.leggauss(n_steps)
-        self._nodes = 0.5 * (nodes + 1.0)
-        self._weights = 0.5 * weights
+        self._nodes = 0.50 * (nodes + 1.00)
+        self._weights = 0.50 * weights
 
     def explain(
         self, data: Any, baseline: Any, baseline_weights: Any
