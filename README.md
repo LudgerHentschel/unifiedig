@@ -5,8 +5,8 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/unifiedig.svg)](https://pypi.org/project/unifiedig/)
 [![License](https://img.shields.io/pypi/l/unifiedig.svg)](LICENSE)
 
-**Integrated Gradients prediction attribution for a broad range of Python
-machine-learning models, through one interface.**
+**Integrated Gradients prediction and loss attribution for a broad range of
+Python machine-learning models, through one interface.**
 
 > **UnifiedIG customizes the solver, not the estimand.**
 
@@ -634,6 +634,105 @@ For affine models, a weighted baseline distribution is collapsed exactly to
 its weighted mean. Polynomial and other nonlinear models retain the complete
 baseline distribution.
 
+## Loss attribution
+
+`Explainer` attributes a change in the model output. `LossExplainer` instead
+attributes the corresponding change in realized prediction loss. The two
+questions are related but distinct: a feature can move a prediction strongly
+while moving it away from the observed outcome, or it can make a smaller
+prediction contribution that materially improves accuracy.
+
+For the same straight-line path
+$x(t)=x_0+t(x-x_0)$, loss attribution applies Integrated Gradients to the
+composite quantity $L(y,f(x))$:
+
+```math
+IG^L_j(x,y;x_0)
+= (x_j-x_{0,j})
+  \int_0^1
+  \frac{\partial L(y,f(x(t)))}{\partial f}
+  \frac{\partial f(x(t))}{\partial x_j}
+  \,dt.
+```
+
+The attributions satisfy the standard UnifiedIG orientation:
+
+```math
+L(y,f(x))
+= L(y,f(x_0)) + \sum_j IG^L_j(x,y;x_0).
+```
+
+Negative values therefore reduce loss and improve the prediction; positive
+values increase loss. This keeps the meaning of `base_values`, completeness,
+and `Explanation.values` aligned between the two explainer classes.
+
+For regression, the canonical built-in loss is mean squared error. Supply the
+observed outcomes when calling the explainer:
+
+```python
+loss_explanation = uig.LossExplainer(
+    model,
+    background,
+    loss="squared_error",
+)(X_test, y_test)
+
+np.testing.assert_allclose(
+    loss_explanation.base_values
+    + loss_explanation.values.sum(axis=1),
+    (y_test - model.predict(X_test)) ** 2,
+)
+```
+
+For binary and multiclass classification, `loss="log_loss"` consumes decision
+scores, raw margins, or logits—not probability outputs. Sigmoid or softmax is
+applied internally only to evaluate log loss and its derivative. UnifiedIG
+attributes the resulting change in loss; it never attributes a change in
+predicted probability.
+
+```python
+loss_explanation = uig.LossExplainer(
+    classifier,
+    background,
+    loss="log_loss",
+)(X_test, y_test)
+```
+
+Loss attribution is not tied to fitting. In normal use, `X_test` and `y_test`
+are held-out observations, so the result explains out-of-sample loss. Training
+observations can be supplied when training loss is genuinely the quantity of
+interest; no refitting occurs in either case.
+
+The same single baseline, weighted baseline matrix, or CBaseline background
+machinery is used by both explainers. Each observation's realized outcome is
+held fixed while its baseline-to-input paths are integrated.
+
+Loss attribution reuses the analytic sklearn, exact TreeIG, PyTorch, JAX,
+TensorFlow/Keras, and explicit finite-difference routes described above.
+Probability-only and numerical path-event tree models remain prediction-only:
+their transformed score paths do not yet expose an exact loss-attribution
+kernel.
+
+Quadrature is specialized when affine structure makes a smaller rule
+sufficient. Affine squared-error loss uses one Gauss--Legendre node exactly;
+affine binary log loss starts at eight nodes and retains completeness-driven
+refinement. Nonlinear loss attribution keeps the general 16-node starting
+point, while exact tree loss attribution uses no quadrature.
+
+For a performance-oriented display, reverse only the final attribution signs:
+
+```python
+loss_reduction = uig.LossExplainer(
+    model,
+    background,
+    loss="squared_error",
+    direction="loss_reduction",
+)(X_test, y_test)
+```
+
+In this convenience view, positive values indicate reduced loss. Internally,
+loss calculations and completeness diagnostics remain in the default
+`"loss_change"` direction; `base_values` are not reversed.
+
 ## Current gaps and deferred scope
 
 Notable remaining gaps include exact structural support for CatBoost and
@@ -652,6 +751,8 @@ Also deferred:
 
 Complete examples are available for:
 
+- [out-of-sample regression loss attribution](examples/loss_attribution.py)
+- [out-of-sample classification loss attribution](examples/loss_classification.py)
 - [a CBaseline reference prediction](examples/cbaseline_reference_prediction.py)
 - [linear regression](examples/linear_regression.py)
 - [binary logistic regression](examples/logistic_regression.py)
@@ -690,6 +791,7 @@ The stable public surface remains deliberately small:
 
 ```python
 uig.Explainer
+uig.LossExplainer
 uig.Explanation
 uig.JaxModel
 uig.TensorFlowModel

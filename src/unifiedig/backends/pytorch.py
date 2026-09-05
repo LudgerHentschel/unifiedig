@@ -5,6 +5,7 @@ from typing import Any, Dict, Literal, Optional
 import numpy as np
 
 from .._keras import validate_keras_output
+from .._loss import LossName
 from .base import BackendResult, classification_score_result
 
 
@@ -43,7 +44,9 @@ class PyTorchBackend:
         self.n_steps = n_steps
         self.batch_size = batch_size
         tensors = list(model.parameters()) + list(model.buffers())
-        reference = next((tensor for tensor in tensors if tensor.is_floating_point()), None)
+        reference = next(
+            (tensor for tensor in tensors if tensor.is_floating_point()), None
+        )
         self.device = reference.device if reference is not None else None
         self.dtype = reference.dtype if reference is not None else None
         self.output_kind = output_kind
@@ -51,9 +54,7 @@ class PyTorchBackend:
         self._nodes = 0.50 * (nodes + 1.00)
         self._weights = 0.50 * weights
 
-    def explain(
-        self, data: Any, baseline: Any, baseline_weights: Any
-    ) -> BackendResult:
+    def explain(self, data: Any, baseline: Any, baseline_weights: Any) -> BackendResult:
         module_states: Dict[Any, bool] = {
             module: module.training for module in self.model.modules()
         }
@@ -69,12 +70,10 @@ class PyTorchBackend:
                     data, baseline, baseline_weights, target=None
                 )
             else:
-                mean_base_value = (
-                    baseline_weights[:, None] * baseline_outputs
-                ).sum(dim=0)
-                base_values = mean_base_value.expand(
-                    data.shape[0], n_outputs
-                ).clone()
+                mean_base_value = (baseline_weights[:, None] * baseline_outputs).sum(
+                    dim=0
+                )
+                base_values = mean_base_value.expand(data.shape[0], n_outputs).clone()
                 by_output = [
                     self._attribute_output(
                         data, baseline, baseline_weights, target=target
@@ -97,11 +96,81 @@ class PyTorchBackend:
                 [str(index) for index in range(n_outputs)],
             )
         output_names = (
-            [str(index) for index in range(n_outputs)]
-            if n_outputs >= 2
-            else None
+            [str(index) for index in range(n_outputs)] if n_outputs >= 2 else None
         )
         return BackendResult(values_array, base_array, output_array, output_names)
+
+    def explain_loss(
+        self,
+        data: Any,
+        baseline: Any,
+        baseline_weights: Any,
+        y: np.ndarray,
+        loss: LossName,
+    ) -> BackendResult:
+        """Attribute a scalar loss with native autograd."""
+
+        torch = self._torch
+        targets = torch.as_tensor(y, device=data.device)
+        nodes = torch.as_tensor(self._nodes, dtype=data.dtype, device=data.device)
+        weights = torch.as_tensor(self._weights, dtype=data.dtype, device=data.device)
+        values = torch.zeros_like(data)
+        n_samples = data.shape[0]
+        baselines_per_batch = max(1, self.batch_size // n_samples)
+        module_states = {module: module.training for module in self.model.modules()}
+        self.model.eval()
+        try:
+            for start in range(0, baseline.shape[0], baselines_per_batch):
+                stop = min(start + baselines_per_batch, baseline.shape[0])
+                baseline_rows = baseline[start:stop]
+                row_weights = baseline_weights[start:stop]
+                delta = data.unsqueeze(0) - baseline_rows.unsqueeze(1)
+                integrated = torch.zeros_like(delta)
+                path_targets = targets.repeat(len(baseline_rows))
+                for node, weight in zip(nodes, weights):
+                    path = (
+                        (baseline_rows.unsqueeze(1) + node * delta)
+                        .reshape(-1, *data.shape[1:])
+                        .detach()
+                        .requires_grad_(True)
+                    )
+                    with torch.enable_grad():
+                        path_loss = self._loss_values(
+                            self._forward(path), path_targets, loss
+                        )
+                        gradient = torch.autograd.grad(path_loss.sum(), path)[0]
+                    integrated += weight * gradient.reshape_as(delta)
+                weight_shape = (len(baseline_rows),) + (1,) * data.ndim
+                values += torch.sum(
+                    row_weights.reshape(weight_shape) * delta * integrated, dim=0
+                )
+            endpoint_loss = self._loss_values(self._forward(data), targets, loss)
+            base_values = torch.zeros_like(endpoint_loss)
+            for baseline_row, weight in zip(baseline, baseline_weights):
+                repeated = baseline_row.unsqueeze(0).expand_as(data)
+                base_values += weight * self._loss_values(
+                    self._forward(repeated), targets, loss
+                )
+        finally:
+            for module, training in module_states.items():
+                module.training = training
+        return BackendResult(
+            self._to_numpy(values),
+            self._to_numpy(base_values),
+            self._to_numpy(endpoint_loss),
+            None,
+        )
+
+    def _loss_values(self, output: Any, y: Any, loss: LossName) -> Any:
+        torch = self._torch
+        if loss == "squared_error":
+            scalar = output if output.ndim == 1 else output[:, 0]
+            return (scalar - y.to(dtype=scalar.dtype)) ** 2
+        if output.ndim == 1:
+            return torch.nn.functional.binary_cross_entropy_with_logits(
+                output, y.to(dtype=output.dtype), reduction="none"
+            )
+        return torch.nn.functional.cross_entropy(output, y.long(), reduction="none")
 
     def _attribute_output(
         self,
@@ -113,9 +182,7 @@ class PyTorchBackend:
     ) -> Any:
         torch = self._torch
         nodes = torch.as_tensor(self._nodes, dtype=data.dtype, device=data.device)
-        weights = torch.as_tensor(
-            self._weights, dtype=data.dtype, device=data.device
-        )
+        weights = torch.as_tensor(self._weights, dtype=data.dtype, device=data.device)
         n_samples = data.shape[0]
         baselines_per_batch = max(1, self.batch_size // n_samples)
         attributions = torch.zeros_like(data)
@@ -128,8 +195,11 @@ class PyTorchBackend:
             integrated = torch.zeros_like(delta)
             for node, weight in zip(nodes, weights):
                 path = (
-                    baseline_rows.unsqueeze(1) + node * delta
-                ).reshape(-1, *data.shape[1:]).detach().requires_grad_(True)
+                    (baseline_rows.unsqueeze(1) + node * delta)
+                    .reshape(-1, *data.shape[1:])
+                    .detach()
+                    .requires_grad_(True)
+                )
                 with torch.enable_grad():
                     output = self._forward(path)
                     selected = output if target is None else output[:, target]

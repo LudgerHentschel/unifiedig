@@ -1,14 +1,15 @@
 """Opt-in Integrated Gradients using batched central finite differences."""
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from typing import Optional
 
 import numpy as np
 from numpy.typing import NDArray
 from sklearn.base import is_classifier, is_regressor
 from sklearn.utils.validation import check_is_fitted
 
+from .._loss import LossName, loss_output_gradient, loss_values
 from .base import BackendResult, classification_score_result
-
 
 FloatArray = NDArray[np.floating]
 
@@ -99,21 +100,21 @@ class FiniteDifferenceBackend:
                 )
                 node_indices = flat_indices // n_samples
                 sample_indices = flat_indices % n_samples
-                path_data = baseline_row + self._nodes[node_indices, None] * difference[
-                    sample_indices
-                ]
+                path_data = (
+                    baseline_row
+                    + self._nodes[node_indices, None] * difference[sample_indices]
+                )
                 jacobian = self._finite_difference_jacobian(path_data, n_outputs)
-                weighted = np.transpose(jacobian, (0, 2, 1)) * self._weights[
-                    node_indices, None, None
-                ]
+                weighted = (
+                    np.transpose(jacobian, (0, 2, 1))
+                    * self._weights[node_indices, None, None]
+                )
                 np.add.at(integrated, sample_indices, weighted)
 
             values += baseline_weight * difference[:, :, None] * integrated
 
         mean_base_value = baseline_weights @ self._model_output(baseline)
-        base_values = np.broadcast_to(
-            mean_base_value, (n_samples, n_outputs)
-        ).copy()
+        base_values = np.broadcast_to(mean_base_value, (n_samples, n_outputs)).copy()
         output_names = self._output_names(n_outputs)
 
         if self._is_classifier and n_outputs >= 2:
@@ -130,6 +131,37 @@ class FiniteDifferenceBackend:
                 output_names,
             )
         return BackendResult(values, base_values, output_values, output_names)
+
+    def explain_loss(
+        self,
+        data: FloatArray,
+        baseline: FloatArray,
+        baseline_weights: FloatArray,
+        y: np.ndarray,
+        loss: LossName,
+    ) -> BackendResult:
+        """Numerically integrate the analytical loss/output chain rule."""
+
+        n_samples, n_features = data.shape
+        n_outputs = self._model_output(data).shape[1]
+        values = np.zeros_like(data, dtype=float)
+        base_values = np.zeros(n_samples, dtype=float)
+        for baseline_row, baseline_weight in zip(baseline, baseline_weights):
+            difference = data - baseline_row
+            integrated = np.zeros_like(data, dtype=float)
+            for node, weight in zip(self._nodes, self._weights):
+                path = baseline_row + node * difference
+                output = self._model_output(path)
+                jacobian = self._finite_difference_jacobian(path, n_outputs)
+                derivative = loss_output_gradient(output, y, loss=loss)
+                integrated += weight * np.einsum("so,sof->sf", derivative, jacobian)
+            values += baseline_weight * difference * integrated
+            baseline_output = self._model_output(
+                np.broadcast_to(baseline_row, (n_samples, n_features))
+            )
+            base_values += baseline_weight * loss_values(baseline_output, y, loss=loss)
+        output_values = loss_values(self._model_output(data), y, loss=loss)
+        return BackendResult(values, base_values, output_values, None)
 
     def _finite_difference_jacobian(
         self, data: FloatArray, n_outputs: int

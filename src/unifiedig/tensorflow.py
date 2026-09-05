@@ -28,4 +28,3 @@ class TensorFlowModel:
             object.__setattr__(
                 self, "output_names", [str(name) for name in self.output_names]
             )
-

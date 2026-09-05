@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add `LossExplainer` for squared-error and binary or multiclass log-loss
+  attribution across analytic sklearn, exact TreeIG, PyTorch, JAX,
+  TensorFlow/Keras, and opt-in finite-difference backends, with shared baseline,
+  completeness-refinement, and optional loss-reduction sign presentation.
+- Specialize affine loss quadrature to one exact node for squared error and an
+  eight-node automatic starting point for binary log loss.
+
 ## 0.1.1.dev1
 
 - Replace the Captum runtime route with native PyTorch autograd, preserving

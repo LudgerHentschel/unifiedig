@@ -52,6 +52,9 @@ layer.
 
 ## Before the next published release
 
+- Verify `LossExplainer` squared-error and score-based log-loss parity across
+  analytic sklearn, exact TreeIG, PyTorch, JAX, TensorFlow/Keras, and explicit
+  finite-difference backends.
 - Run source-tree and installed-wheel tests for all optional backends.
 - Review the README, changelog, error messages, and dependency matrix against
   the packaged artifacts.

@@ -5,6 +5,7 @@ from typing import Optional, Sequence
 import numpy as np
 from numpy.typing import NDArray
 
+from .._loss import LossName, loss_values
 from .base import BackendResult, classification_score_result
 
 
@@ -84,9 +85,7 @@ class TreeIGBackend:
                     raise original_error
                 self._explainer = candidate
                 self._n_outputs = int(arrays["n_outputs"])
-                self._class_names = [
-                    str(index) for index in range(self._n_outputs)
-                ]
+                self._class_names = [str(index) for index in range(self._n_outputs)]
             else:
                 self._n_outputs = 1
                 self._class_names = None
@@ -150,3 +149,63 @@ class TreeIGBackend:
         if classes is not None:
             output_names = [str(classes[1])]
         return BackendResult(values, base_values, output_values, output_names)
+
+    def explain_loss(
+        self,
+        data: NDArray[np.floating],
+        baseline: NDArray[np.floating],
+        baseline_weights: NDArray[np.floating],
+        y: np.ndarray,
+        loss: LossName,
+    ) -> BackendResult:
+        """Attribute loss changes with TreeIG's exact path-event kernels."""
+
+        if self._n_outputs > 1:
+            if loss != "log_loss":
+                raise ValueError("squared_error requires exactly one model output")
+            result = self._explainer.multiclass_loss_attribution(
+                data,
+                y,
+                baseline=baseline,
+                baseline_weights=baseline_weights,
+                n_classes=self._n_outputs,
+            )
+            endpoint_scores = np.column_stack(
+                [
+                    self._explainer.model_output(data, target=target)
+                    for target in range(self._n_outputs)
+                ]
+            )
+            baseline_scores = np.stack(
+                [
+                    np.column_stack(
+                        [
+                            self._explainer.model_output(
+                                baseline_row[None, :], target=target
+                            )
+                            for target in range(self._n_outputs)
+                        ]
+                    )[0]
+                    for baseline_row in baseline
+                ]
+            )
+        else:
+            result = self._explainer.loss_attribution(
+                data,
+                y,
+                baseline=baseline,
+                baseline_weights=baseline_weights,
+                loss=loss,
+            )
+            endpoint_scores = np.asarray(result["endpoint_prediction"])[:, None]
+            baseline_scores = np.asarray(
+                self._explainer.model_output(baseline)
+            ).reshape(-1, 1)
+
+        values = -np.asarray(result["observation_values"])
+        output_values = loss_values(endpoint_scores, y, loss=loss)
+        base_values = np.zeros(data.shape[0], dtype=float)
+        for scores, weight in zip(baseline_scores, baseline_weights):
+            repeated = np.broadcast_to(scores, (data.shape[0], len(scores)))
+            base_values += weight * loss_values(repeated, y, loss=loss)
+        return BackendResult(values, base_values, output_values, None)

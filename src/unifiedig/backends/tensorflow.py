@@ -5,6 +5,7 @@ from typing import Any, List, Literal, Optional
 import numpy as np
 
 from .._keras import keras_backend, keras_dtype, validate_keras_output
+from .._loss import LossName
 from ..tensorflow import TensorFlowModel
 from .base import BackendResult, classification_score_result
 
@@ -62,9 +63,7 @@ class TensorFlowBackend:
         self._nodes = 0.5 * (nodes + 1.0)
         self._weights = 0.5 * weights
 
-    def explain(
-        self, data: Any, baseline: Any, baseline_weights: Any
-    ) -> BackendResult:
+    def explain(self, data: Any, baseline: Any, baseline_weights: Any) -> BackendResult:
         tf = self._tf
         output_values = self._forward(data)
         baseline_outputs = self._forward(baseline)
@@ -79,18 +78,14 @@ class TensorFlowBackend:
             base_values = tf.broadcast_to(mean_base, (data.shape[0],))
         else:
             by_output = [
-                self._attribute_output(
-                    data, baseline, baseline_weights, target=target
-                )
+                self._attribute_output(data, baseline, baseline_weights, target=target)
                 for target in range(n_outputs)
             ]
             values = tf.stack(by_output, axis=-1)
             mean_base = tf.reduce_sum(
                 output_weights[:, None] * baseline_outputs, axis=0
             )
-            base_values = tf.broadcast_to(
-                mean_base, (data.shape[0], n_outputs)
-            )
+            base_values = tf.broadcast_to(mean_base, (data.shape[0], n_outputs))
 
         values_array = values.numpy()
         base_array = base_values.numpy()
@@ -112,12 +107,70 @@ class TensorFlowBackend:
             output_names: Optional[List[str]] = list(self.output_names)
         else:
             output_names = (
-                [str(index) for index in range(n_outputs)]
-                if n_outputs >= 2
-                else None
+                [str(index) for index in range(n_outputs)] if n_outputs >= 2 else None
+            )
+        return BackendResult(values_array, base_array, output_array, output_names)
+
+    def explain_loss(
+        self,
+        data: Any,
+        baseline: Any,
+        baseline_weights: Any,
+        y: np.ndarray,
+        loss: LossName,
+    ) -> BackendResult:
+        """Attribute a scalar loss with TensorFlow automatic gradients."""
+
+        tf = self._tf
+        targets = tf.convert_to_tensor(y)
+        nodes = tf.convert_to_tensor(self._nodes, dtype=data.dtype)
+        weights = tf.convert_to_tensor(self._weights, dtype=data.dtype)
+        node_shape = (self.n_steps,) + (1,) * data.shape.rank
+        nodes = tf.reshape(nodes, node_shape)
+        values = tf.zeros_like(data)
+        for baseline_row, baseline_weight in zip(baseline, baseline_weights):
+            delta = data - baseline_row
+            path = baseline_row + nodes * delta[None, ...]
+            flat_path = tf.reshape(path, (-1,) + tuple(data.shape[1:]))
+            path_targets = tf.tile(targets, [self.n_steps])
+            with tf.GradientTape(watch_accessed_variables=False) as tape:
+                tape.watch(flat_path)
+                path_loss = self._loss_values(
+                    self._forward(flat_path), path_targets, loss
+                )
+            gradient = tape.gradient(
+                path_loss,
+                flat_path,
+                unconnected_gradients=tf.UnconnectedGradients.ZERO,
+            )
+            gradients = tf.reshape(gradient, tf.shape(path))
+            weight_shape = (self.n_steps,) + (1,) * data.shape.rank
+            integrated = tf.reduce_sum(
+                tf.reshape(weights, weight_shape) * gradients, axis=0
+            )
+            values += baseline_weight * delta * integrated
+        endpoint_loss = self._loss_values(self._forward(data), targets, loss)
+        base_values = tf.zeros_like(endpoint_loss)
+        for baseline_row, weight in zip(baseline, baseline_weights):
+            repeated = tf.broadcast_to(baseline_row, tf.shape(data))
+            base_values += weight * self._loss_values(
+                self._forward(repeated), targets, loss
             )
         return BackendResult(
-            values_array, base_array, output_array, output_names
+            values.numpy(), base_values.numpy(), endpoint_loss.numpy(), None
+        )
+
+    def _loss_values(self, output: Any, y: Any, loss: LossName) -> Any:
+        tf = self._tf
+        if loss == "squared_error":
+            scalar = output if output.shape.rank == 1 else output[:, 0]
+            return tf.square(scalar - tf.cast(y, scalar.dtype))
+        if output.shape.rank == 1:
+            return tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=tf.cast(y, output.dtype), logits=output
+            )
+        return tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=tf.cast(y, tf.int32), logits=output
         )
 
     def _attribute_output(

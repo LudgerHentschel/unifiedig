@@ -1,13 +1,14 @@
 """Integrated Gradients for smooth models supported by skgrad."""
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from typing import Optional
 
 import numpy as np
-from numpy.typing import NDArray
 import skgrad
+from numpy.typing import NDArray
 
+from .._loss import LossName, loss_output_gradient, loss_values
 from .base import BackendResult, classification_score_result
-
 
 FloatArray = NDArray[np.floating]
 
@@ -42,6 +43,10 @@ class SkgradBackend:
         )
 
         self.model = model
+        loss_nodes, loss_weights = np.polynomial.legendre.leggauss(n_steps)
+        self._loss_nodes = (loss_nodes + 1.0) / 2.0
+        self._loss_weights = loss_weights / 2.0
+        self.loss_n_steps = n_steps
         self.n_steps = n_steps
         self.batch_size = batch_size
         self._n_outputs = sample_output.shape[1]
@@ -52,6 +57,22 @@ class SkgradBackend:
         nodes, weights = np.polynomial.legendre.leggauss(self.n_steps)
         self._nodes = (nodes + 1.0) / 2.0
         self._weights = weights / 2.0
+
+    def configure_loss_quadrature(self, loss: LossName, *, automatic: bool) -> None:
+        """Specialize loss quadrature when affine structure permits it."""
+
+        if not self._constant_jacobian:
+            return
+        if loss == "squared_error":
+            self._set_loss_quadrature(1)
+        elif automatic:
+            self._set_loss_quadrature(8)
+
+    def _set_loss_quadrature(self, n_steps: int) -> None:
+        nodes, weights = np.polynomial.legendre.leggauss(n_steps)
+        self._loss_nodes = (nodes + 1.0) / 2.0
+        self._loss_weights = weights / 2.0
+        self.loss_n_steps = n_steps
 
     def explain(
         self,
@@ -65,13 +86,9 @@ class SkgradBackend:
         if self._constant_jacobian:
             mean_baseline = baseline_weights @ baseline
             difference = data - mean_baseline
-            jacobian = skgrad.input_jacobian(
-                self.model, mean_baseline[None, :]
-            )[0]
+            jacobian = skgrad.input_jacobian(self.model, mean_baseline[None, :])[0]
             values = difference[:, :, None] * jacobian.T[None, :, :]
-            mean_base_value = skgrad.model_output(
-                self.model, mean_baseline[None, :]
-            )[0]
+            mean_base_value = skgrad.model_output(self.model, mean_baseline[None, :])[0]
         elif self._n_outputs == 1:
             values = self._integrated_scalar_distribution(
                 data, baseline, baseline_weights
@@ -87,9 +104,7 @@ class SkgradBackend:
                 baseline_values = (
                     baseline_weight * difference[:, :, None] * integrated_jacobian
                 )
-                values = (
-                    baseline_values if values is None else values + baseline_values
-                )
+                values = baseline_values if values is None else values + baseline_values
             assert values is not None
             mean_base_value = baseline_weights @ skgrad.model_output(
                 self.model, baseline
@@ -118,6 +133,58 @@ class SkgradBackend:
                 output_names,
             )
         return BackendResult(values, base_values, output_values, output_names)
+
+    def explain_loss(
+        self,
+        data: FloatArray,
+        baseline: FloatArray,
+        baseline_weights: FloatArray,
+        y: np.ndarray,
+        loss: LossName,
+    ) -> BackendResult:
+        """Integrate an analytical loss derivative through skgrad Jacobians."""
+
+        n_samples, n_features = data.shape
+        values = np.zeros_like(data, dtype=float)
+        base_values = np.zeros(n_samples, dtype=float)
+        baselines_per_batch = max(1, self.batch_size // n_samples)
+        for start in range(0, len(baseline), baselines_per_batch):
+            stop = min(start + baselines_per_batch, len(baseline))
+            baseline_rows = baseline[start:stop]
+            row_weights = baseline_weights[start:stop]
+            difference = data[None, :, :] - baseline_rows[:, None, :]
+            integrated = np.zeros_like(difference, dtype=float)
+            path_targets = np.tile(y, len(baseline_rows))
+            for node, quadrature_weight in zip(self._loss_nodes, self._loss_weights):
+                result = skgrad.value_and_jacobian(
+                    self.model,
+                    (baseline_rows[:, None, :] + node * difference).reshape(
+                        -1, n_features
+                    ),
+                )
+                derivative = loss_output_gradient(
+                    result.values, path_targets, loss=loss
+                )
+                path_gradient = np.einsum(
+                    "so,sof->sf", derivative, result.jacobian
+                ).reshape(len(baseline_rows), n_samples, n_features)
+                integrated += quadrature_weight * path_gradient
+            values += np.sum(
+                row_weights[:, None, None] * difference * integrated, axis=0
+            )
+            baseline_output = skgrad.model_output(
+                self.model,
+                np.broadcast_to(
+                    baseline_rows[:, None, :],
+                    (len(baseline_rows), n_samples, n_features),
+                ).reshape(-1, n_features),
+            )
+            baseline_losses = loss_values(
+                baseline_output, path_targets, loss=loss
+            ).reshape(len(baseline_rows), n_samples)
+            base_values += np.sum(row_weights[:, None] * baseline_losses, axis=0)
+        output_values = loss_values(skgrad.model_output(self.model, data), y, loss=loss)
+        return BackendResult(values, base_values, output_values, None)
 
     def _integrated_scalar_distribution(
         self,

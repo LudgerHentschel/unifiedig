@@ -6,6 +6,7 @@ from typing import Any, List, Literal, Optional
 import numpy as np
 
 from .._keras import keras_backend, keras_dtype, validate_keras_output
+from .._loss import LossName
 from ..jax import JaxModel
 from .base import BackendResult, classification_score_result
 
@@ -53,9 +54,7 @@ class JaxBackend:
         self._nodes = 0.50 * (nodes + 1.00)
         self._weights = 0.50 * weights
 
-    def explain(
-        self, data: Any, baseline: Any, baseline_weights: Any
-    ) -> BackendResult:
+    def explain(self, data: Any, baseline: Any, baseline_weights: Any) -> BackendResult:
         jnp = self._jnp
         output_values = self._forward(data)
         baseline_outputs = self._forward(baseline)
@@ -69,18 +68,12 @@ class JaxBackend:
             base_values = jnp.broadcast_to(mean_base, (data.shape[0],))
         else:
             by_output = [
-                self._attribute_output(
-                    data, baseline, baseline_weights, target=target
-                )
+                self._attribute_output(data, baseline, baseline_weights, target=target)
                 for target in range(n_outputs)
             ]
             values = jnp.stack(by_output, axis=-1)
-            mean_base = jnp.sum(
-                baseline_weights[:, None] * baseline_outputs, axis=0
-            )
-            base_values = jnp.broadcast_to(
-                mean_base, (data.shape[0], n_outputs)
-            )
+            mean_base = jnp.sum(baseline_weights[:, None] * baseline_outputs, axis=0)
+            base_values = jnp.broadcast_to(mean_base, (data.shape[0], n_outputs))
 
         values_array = np.asarray(values)
         base_array = np.asarray(base_values)
@@ -102,12 +95,69 @@ class JaxBackend:
             output_names: Optional[List[str]] = list(self.model.output_names)
         else:
             output_names = (
-                [str(index) for index in range(n_outputs)]
-                if n_outputs >= 2
-                else None
+                [str(index) for index in range(n_outputs)] if n_outputs >= 2 else None
+            )
+        return BackendResult(values_array, base_array, output_array, output_names)
+
+    def explain_loss(
+        self,
+        data: Any,
+        baseline: Any,
+        baseline_weights: Any,
+        y: np.ndarray,
+        loss: LossName,
+    ) -> BackendResult:
+        """Attribute a scalar loss with JAX automatic gradients."""
+
+        jax, jnp = self._jax, self._jnp
+        targets = jnp.asarray(y)
+        nodes = jnp.asarray(self._nodes, dtype=data.dtype)
+        weights = jnp.asarray(self._weights, dtype=data.dtype)
+        values = jnp.zeros_like(data)
+
+        def summed_loss(path_data: Any) -> Any:
+            return jnp.sum(self._loss_values(self._forward(path_data), targets, loss))
+
+        gradient = jax.grad(summed_loss)
+        for baseline_row, baseline_weight in zip(baseline, baseline_weights):
+            delta = data - baseline_row
+
+            def accumulate(
+                current: Any,
+                node_weight: Any,
+                baseline_row: Any = baseline_row,
+                delta: Any = delta,
+            ) -> Any:
+                node, weight = node_weight
+                return current + weight * gradient(baseline_row + node * delta), None
+
+            integrated, _ = jax.lax.scan(
+                accumulate, jnp.zeros_like(data), (nodes, weights)
+            )
+            values = values + baseline_weight * delta * integrated
+        endpoint_loss = self._loss_values(self._forward(data), targets, loss)
+        base_values = jnp.zeros_like(endpoint_loss)
+        for baseline_row, weight in zip(baseline, baseline_weights):
+            repeated = jnp.broadcast_to(baseline_row, data.shape)
+            base_values = base_values + weight * self._loss_values(
+                self._forward(repeated), targets, loss
             )
         return BackendResult(
-            values_array, base_array, output_array, output_names
+            np.asarray(values), np.asarray(base_values), np.asarray(endpoint_loss), None
+        )
+
+    def _loss_values(self, output: Any, y: Any, loss: LossName) -> Any:
+        jnp = self._jnp
+        if loss == "squared_error":
+            scalar = output if output.ndim == 1 else output[:, 0]
+            return (scalar - y.astype(scalar.dtype)) ** 2
+        if output.ndim == 1:
+            return jnp.logaddexp(0.0, output) - y.astype(output.dtype) * output
+        maximum = jnp.max(output, axis=1)
+        return (
+            maximum
+            + jnp.log(jnp.sum(jnp.exp(output - maximum[:, None]), axis=1))
+            - output[jnp.arange(y.shape[0]), y.astype(int)]
         )
 
     def _attribute_output(
@@ -174,8 +224,7 @@ class JaxBackend:
         ):
             return output
         raise ValueError(
-            "JAX models must return one scalar or one output vector for "
-            "every sample"
+            "JAX models must return one scalar or one output vector for every sample"
         )
 
     def _resolve_dtype(self, dtype: Any) -> Any:
