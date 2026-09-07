@@ -22,15 +22,13 @@ The package job installs the wheel into a fresh environment using public
 package resolution, runs `pip check` and the runnable README example, and
 rebuilds a wheel from the sdist.
 
-Only a **published GitHub release** triggers the PyPI workflow; a tag push alone
-never publishes. The release tag must equal `v` plus the package version.
-Development and local versions are rejected. The release job tests all optional
-backends, validates build metadata, rebuilds from the sdist, and smoke-tests a
-fresh wheel installation before the OIDC publishing job can run.
-
-When explicitly authorized to publish, create the matching tag and GitHub
-release after CI passes. This workflow intentionally leaves version selection,
-release creation, PyPI publication, and repository visibility to the maintainer.
+A matching `v<version>` tag push triggers release validation and PyPI
+publication. A manually published GitHub release does not trigger publication.
+The release job tests all optional backends, validates build metadata, rebuilds
+from the sdist, and smoke-tests a fresh wheel installation before publishing.
+A separate job then creates the GitHub release and attaches the distributions.
+See [publishing releases](publishing.md) for the tag procedure, prerelease
+handling, and recovery when GitHub release creation fails after PyPI succeeds.
 
 ## Documentation site
 

@@ -157,3 +157,5 @@ machinery. It is an additional capability beyond prediction attribution.
 - [Issue tracker](https://github.com/LudgerHentschel/unifiedig/issues)
 - [BSD-3-Clause license](LICENSE) and [software citation](CITATION.cff)
 - [The IG stack: CBaseline, skgrad, TreeIG, and UnifiedIG](https://ludgerhentschel.github.io/unifiedig/ig-stack.html)
+
+Release maintainers: see [Publishing releases](docs/publishing.md).
