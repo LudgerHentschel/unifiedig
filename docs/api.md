@@ -16,6 +16,7 @@ and [semantics](semantics.md).
 | `attribute_after` | Named preprocessing boundary, using original inputs |
 | `n_steps` | Fixed quadrature node count, or automatic refinement when omitted |
 | `check_completeness`, `completeness_atol`, `completeness_rtol` | Reconstruction checks and automatic refinement trigger |
+| `on_incomplete` | `"warn"` (default) emits RuntimeWarning; `"raise"` raises RuntimeError after failed completeness checks and any refinement; applies to both explainers |
 | `fallback` | Explicit `finite_difference` or `tree_numeric` route for eligible models |
 | `finite_difference_step`, `finite_difference_batch_size` | Central-difference perturbation and batch bound |
 | `gradient_batch_size` | Smooth-backend path-row batch bound |

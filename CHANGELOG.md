@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.6 — 2026-09-07
+
+- Add `on_incomplete="warn"|"raise"` to prediction and loss explainers,
+  preserving warnings by default and allowing strict completeness enforcement.
+- Document ReLU integration limits, explicit resolution budgets, and the
+  distinction between completeness and feature-level accuracy.
+
 - Include Matplotlib in the `shap` and `all` extras so SHAP plotting examples
   and documentation checks work in clean installations.
 

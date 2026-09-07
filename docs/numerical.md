@@ -20,6 +20,52 @@ explainer = uig.Explainer(
 result = explainer(X_eval)
 ```
 
+## Enforce completeness tolerances
+
+Both `Explainer` and `LossExplainer` default to `on_incomplete="warn"`:
+failed tolerances emit a `RuntimeWarning` and return the explanation. Python's
+warning filters may suppress repeated warnings from the same location.
+Use `on_incomplete="raise"` to raise `RuntimeError` instead of returning an
+out-of-tolerance explanation, after any automatic refinement is exhausted.
+The check applies to every observation and output, using
+`abs(residual) <= completeness_atol + completeness_rtol * abs(endpoint)`;
+for loss attribution, the endpoint is the loss.
+
+```python
+explainer = uig.Explainer(
+    model, background, on_incomplete="raise",
+    completeness_atol=1e-6, completeness_rtol=1e-4,
+)
+result = explainer(X_eval)  # raises if the final residual exceeds tolerance
+```
+
+`check_completeness=False` disables warnings, exceptions, and automatic
+refinement even when `on_incomplete="raise"`. The returned explanation still
+contains `completeness_error` and `max_abs_completeness_error`.
+
+## ReLU networks
+
+ReLU is the default hidden activation of sklearn's MLP estimators and is also
+used in framework networks. When an integration path crosses an activation
+boundary, its gradient can jump. Gauss–Legendre quadrature then loses the
+rapid convergence available for smooth integrands. Residuals around `1e-3`
+can remain at 64 nodes for some models and paths; this is illustrative, not
+an error bound or a universal convergence rate. Paths staying inside one
+activation region can still integrate accurately with very few nodes.
+
+The automatic 16/32/64-node budget may therefore be insufficient. Choose an
+explicit larger budget, such as `n_steps=256` or `1024`, and compare both
+feature attributions and completeness residuals across resolutions. More
+nodes cost more work and do not guarantee a monotonic error decrease or that
+a requested tolerance will be met. `gradient_batch_size` bounds path batching;
+it does not increase integration accuracy. Float32 precision can also limit
+the achievable tolerance.
+
+Use `on_incomplete="raise"` when downstream work requires a passing residual.
+A passing check alone cannot establish feature-level accuracy, because errors
+can cancel. Exact integration by detecting ReLU activation-region boundaries
+remains a separate [roadmap](roadmap.md) feature.
+
 ## Interpret the diagnostic
 
 A small completeness residual is necessary for a well-resolved path

@@ -8,7 +8,7 @@
   was resolved before the successful UnifiedIG trial CI run.
 - Run CI against published dependencies. Local sibling package validation is
   useful but does not demonstrate a successful public one-install workflow.
-- Replace `0.1.1.dev1` with the intended release version in `pyproject.toml`,
+- Set the intended release version in `pyproject.toml`,
   finalize the Unreleased changelog, and review the release contents.
 - Configure the GitHub `pypi` environment and PyPI trusted publisher for this
   repository's `release.yml` workflow. Environment protection may require a

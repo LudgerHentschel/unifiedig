@@ -287,3 +287,63 @@ def test_invalid_completeness_tolerance_is_rejected(name, value):
 def test_check_completeness_must_be_boolean():
     with pytest.raises(ValueError, match="boolean"):
         uig.Explainer(fitted_one_neuron_mlp(), [0.0], check_completeness=1)
+
+
+@pytest.mark.parametrize("loss", [False, True])
+@pytest.mark.parametrize("policy", ["warn", "raise"])
+def test_incomplete_policy_on_relu_path(loss, policy):
+    model = fitted_one_neuron_mlp()
+    cls = uig.LossExplainer if loss else uig.Explainer
+    explainer = cls(model, [0.0], n_steps=1, on_incomplete=policy)
+    args = ([[1.0]], [0.0]) if loss else ([[1.0]],)
+    if policy == "raise":
+        with pytest.raises(RuntimeError, match="completeness tolerance"):
+            explainer(*args)
+    else:
+        with pytest.warns(RuntimeWarning, match="completeness tolerance"):
+            result = explainer(*args)
+        assert result.max_abs_completeness_error > 0.1
+    assert explainer.n_steps == 1
+
+
+@pytest.mark.parametrize("loss", [False, True])
+def test_strict_policy_respects_disabled_check(loss):
+    cls = uig.LossExplainer if loss else uig.Explainer
+    explainer = cls(fitted_one_neuron_mlp(), [0.0],
+                    on_incomplete="raise", check_completeness=False, n_steps=1)
+    args = ([[1.0]], [0.0]) if loss else ([[1.0]],)
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always")
+        result = explainer(*args)
+    assert not recorded
+    assert result.max_abs_completeness_error > 0.1
+
+
+@pytest.mark.parametrize("loss", [False, True])
+def test_strict_policy_returns_complete_result(loss):
+    cls = uig.LossExplainer if loss else uig.Explainer
+    explainer = cls(fitted_one_neuron_mlp(), [0.6], on_incomplete="raise")
+    args = ([[1.0]], [0.0]) if loss else ([[1.0]],)
+    assert explainer(*args).max_abs_completeness_error < 1e-12
+
+
+@pytest.mark.parametrize("loss", [False, True])
+def test_strict_policy_raises_only_after_refinement_exhausted(loss):
+    model = fitted_one_neuron_mlp()
+    model.intercepts_[0][:] = -0.37
+    cls = uig.LossExplainer if loss else uig.Explainer
+    explainer = cls(model, [0.0], on_incomplete="raise",
+                    completeness_atol=1e-12, completeness_rtol=1e-12)
+    args = ([[1.0]], [0.0]) if loss else ([[1.0]],)
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="completeness tolerance"):
+            explainer(*args)
+        assert explainer.n_steps == 64
+
+
+@pytest.mark.parametrize("loss", [False, True])
+@pytest.mark.parametrize("policy", [None, "ignore", True])
+def test_invalid_incomplete_policy(loss, policy):
+    cls = uig.LossExplainer if loss else uig.Explainer
+    with pytest.raises(ValueError, match="on_incomplete"):
+        cls(fitted_one_neuron_mlp(), [0.0], on_incomplete=policy)

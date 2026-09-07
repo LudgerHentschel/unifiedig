@@ -47,6 +47,10 @@ class Explainer:
     backends and is ignored by exact backends. When omitted, gradient backends
     start at 16 nodes and retry at 32 or 64 only if completeness fails. An
     explicit integer disables this automatic refinement.
+    With ``check_completeness=True``, ``on_incomplete="warn"`` emits a
+    RuntimeWarning if tolerances still fail after refinement; ``"raise"``
+    raises RuntimeError instead of returning an explanation. Disabling the
+    check disables both actions, but residuals are still returned.
 
     Classifiers are explained on their decision-score scale. Binary outputs use
     one margin; multiclass outputs use the complete centered score vector.
@@ -84,6 +88,7 @@ class Explainer:
         attribute_after: Optional[str] = None,
         n_steps: Optional[int] = None,
         check_completeness: bool = True,
+        on_incomplete: Literal["warn", "raise"] = "warn",
         completeness_atol: float = 1e-6,
         completeness_rtol: float = 1e-4,
         fallback: Optional[str] = None,
@@ -105,6 +110,8 @@ class Explainer:
             raise ValueError("n_steps must be a positive integer")
         if not isinstance(check_completeness, bool):
             raise ValueError("check_completeness must be a boolean")
+        if on_incomplete not in ("warn", "raise"):
+            raise ValueError("on_incomplete must be 'warn' or 'raise'")
         if fallback not in (None, "finite_difference", "tree_numeric"):
             raise ValueError(
                 "fallback must be None, 'finite_difference', or 'tree_numeric'"
@@ -165,6 +172,7 @@ class Explainer:
         self._automatic_steps = automatic_steps
         self._backend_factory: Optional[Callable[[int], Backend]] = None
         self.output_kind = output_kind
+        self.on_incomplete = on_incomplete
         self.check_completeness = check_completeness
         self.completeness_atol = self._validate_tolerance(
             "completeness_atol", completeness_atol
@@ -321,15 +329,16 @@ class Explainer:
         if self.check_completeness and self._completeness_failed(
             completeness_error, backend_result.output_values
         ):
-            warnings.warn(
+            message = (
                 "Integrated Gradients completeness tolerance was not met; "
                 f"maximum absolute error is {np.max(np.abs(completeness_error)):.3g}. "
                 "Increase the relevant numerical resolution (n_steps for "
                 "gradient integration, or tree_grid_size/tree_max_refine "
-                "for numerical trees).",
-                RuntimeWarning,
-                stacklevel=2,
+                "for numerical trees)."
             )
+            if self.on_incomplete == "raise":
+                raise RuntimeError(message)
+            warnings.warn(message, RuntimeWarning, stacklevel=2)
         return Explanation(
             values=backend_result.values,
             base_values=backend_result.base_values,

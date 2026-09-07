@@ -71,6 +71,7 @@ class LossExplainer:
         direction: Literal["loss_change", "loss_reduction"] = "loss_change",
         n_steps: int | None = None,
         check_completeness: bool = True,
+        on_incomplete: Literal["warn", "raise"] = "warn",
         completeness_atol: float = 1e-6,
         completeness_rtol: float = 1e-4,
         fallback: str | None = None,
@@ -93,6 +94,7 @@ class LossExplainer:
             attribute_after=attribute_after,
             n_steps=n_steps,
             check_completeness=check_completeness,
+            on_incomplete=on_incomplete,
             completeness_atol=completeness_atol,
             completeness_rtol=completeness_rtol,
             fallback=fallback,
@@ -157,12 +159,14 @@ class LossExplainer:
         if self._explainer.check_completeness and self._explainer._completeness_failed(
             error, result.output_values
         ):
-            warnings.warn(
+            message = (
                 "Loss Integrated Gradients completeness tolerance was not met; "
-                f"maximum absolute error is {np.max(np.abs(error)):.3g}.",
-                RuntimeWarning,
-                stacklevel=2,
+                f"maximum absolute error is {np.max(np.abs(error)):.3g}. "
+                "Increase n_steps for numerical gradient integration."
             )
+            if self._explainer.on_incomplete == "raise":
+                raise RuntimeError(message)
+            warnings.warn(message, RuntimeWarning, stacklevel=2)
         values = -result.values if self.direction == "loss_reduction" else result.values
         return Explanation(
             values=values,
