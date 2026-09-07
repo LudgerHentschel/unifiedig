@@ -1,4 +1,7 @@
 include LICENSE
+include CITATION.cff
+recursive-include scripts *.py
+recursive-include tests *.py
 include CHANGELOG.md
 recursive-include benchmarks *.py
 recursive-include docs *.md

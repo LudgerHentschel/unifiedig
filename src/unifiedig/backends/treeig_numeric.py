@@ -54,8 +54,8 @@ class TreeIGNumericBackend:
             import treeig
         except ImportError as exc:
             raise ImportError(
-                "Numerical tree support requires TreeIG 0.1.11 or newer. "
-                "Install it with `pip install unifiedig[trees]`."
+                "Numerical tree support requires TreeIG 0.2.0 or newer. "
+                "Install it with `pip install --upgrade unifiedig`."
             ) from exc
         if not self.supports(model):
             raise TypeError(

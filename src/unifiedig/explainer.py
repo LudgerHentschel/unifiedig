@@ -17,6 +17,8 @@ from .backends import (
     TreeIGNumericBackend,
 )
 from .baselines import (
+    _baseline_parts,
+    normalize_baseline,
     normalize_inputs,
     normalize_jax_inputs,
     normalize_tensorflow_inputs,
@@ -60,6 +62,12 @@ class Explainer:
     :class:`unifiedig.TensorFlowModel`. TensorFlow-backed Keras models work
     directly.
 
+    For a fitted sklearn pipeline, ``attribute_after="scale"`` attributes to
+    features after the named preprocessing step. Nested paths such as
+    ``"preprocess__scale"`` are accepted. Always supply original observations and
+    baselines: both are transformed together before constructing paths in the
+    selected space. The default ``None`` explains original model inputs.
+
     Vector-valued automatic-gradient outputs are treated as class scores by
     default. Set ``output_kind="regression"`` for multi-output regression.
     Known sklearn and tree estimators declare their own output semantics and
@@ -73,6 +81,7 @@ class Explainer:
         baseline: Any,
         *,
         baseline_weights: Optional[Any] = None,
+        attribute_after: Optional[str] = None,
         n_steps: Optional[int] = None,
         check_completeness: bool = True,
         completeness_atol: float = 1e-6,
@@ -142,6 +151,13 @@ class Explainer:
             raise ValueError(
                 "probability_floor must be strictly between 0 and 1"
             )
+        self.source_model = model
+        self.attribute_after = attribute_after
+        self._pipeline_view = None
+        if attribute_after is not None:
+            from skgrad import pipeline_view
+            self._pipeline_view = pipeline_view(model, after=attribute_after)
+            model = self._pipeline_view.model
         self.model = model
         self.baseline = baseline
         self.baseline_weights = baseline_weights
@@ -234,8 +250,13 @@ class Explainer:
                     )
                 self._backend = backend_type(model, n_steps=resolved_n_steps)
 
+        if self._pipeline_view is not None and getattr(
+            self._backend, "input_kind", "numpy"
+        ) != "numpy":
+            raise TypeError("attribute_after currently requires a NumPy-input backend")
+
     def __call__(self, data: Any) -> Explanation:
-        feature_names = self._feature_names(data)
+        feature_names = self._attribution_feature_names(data)
         input_kind = getattr(self._backend, "input_kind", "numpy")
         if input_kind == "torch":
             (
@@ -271,8 +292,8 @@ class Explainer:
             )
             explanation_data = normalized_data.numpy()
         else:
-            normalized_data, normalized_baseline, normalized_weights = normalize_inputs(
-                data, self.baseline, self.baseline_weights
+            normalized_data, normalized_baseline, normalized_weights = (
+                self._normalize_numpy_inputs(data)
             )
             explanation_data = normalized_data
         backend_result = self._backend.explain(
@@ -316,7 +337,30 @@ class Explainer:
             feature_names=feature_names,
             output_names=backend_result.output_names,
             completeness_error=completeness_error,
+            attribute_after=self.attribute_after,
         )
+
+    def _attribution_feature_names(self, data: Any) -> Optional[Sequence[str]]:
+        names = self._feature_names(data)
+        if self._pipeline_view is None:
+            return names
+        return list(self._pipeline_view.get_feature_names_out(names))
+
+    def _normalize_numpy_inputs(self, data: Any):
+        if self._pipeline_view is None:
+            return normalize_inputs(data, self.baseline, self.baseline_weights)
+        view = self._pipeline_view
+        rows, weights = _baseline_parts(self.baseline, self.baseline_weights)
+        baseline = normalize_baseline(
+            rows, n_features=self.source_model.n_features_in_
+        )
+        # Retain DataFrame labels for schema validation. Scalar baselines are
+        # expanded in original coordinates, before applying preprocessing.
+        if getattr(rows, "columns", None) is not None:
+            baseline = rows
+        transformed_data = view.transform(data)
+        transformed_baseline = view.transform(baseline)
+        return normalize_inputs(transformed_data, transformed_baseline, weights)
 
     def _completeness_failed(
         self, completeness_error: np.ndarray, output_values: np.ndarray

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Standardize the license and package metadata to BSD-3-Clause.
+- Require Python 3.10+, CBaseline 0.1.2, skgrad 0.1.5, and TreeIG 0.2.0;
+  bound the pre-1.0 backend dependencies to their tested minor series.
+- Put one-install setup before the CBaseline quick start; document backend
+  dispatch, output conventions, and release prerequisites.
+- Test real CBaseline integration and cross-interface attribution invariants.
+- Gate PyPI publishing on a published GitHub release with a matching,
+  non-development version; validate fresh wheel installation and sdist builds.
+- Add software citation metadata.
+
+- Add explicit `attribute_after` feature-space selection to Explainer and
+  LossExplainer, including nested pipeline steps, row-wise baseline
+  transformation, transformed feature names, and Explanation metadata.
+- Require skgrad 0.1.5 for pipeline feature-space views.
+
 - Add `LossExplainer` for squared-error and binary or multiclass log-loss
   attribution across analytic sklearn, exact TreeIG, PyTorch, JAX,
   TensorFlow/Keras, and opt-in finite-difference backends, with shared baseline,

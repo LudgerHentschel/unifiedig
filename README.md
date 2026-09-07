@@ -3,7 +3,7 @@
 [![Tests](https://github.com/LudgerHentschel/unifiedig/actions/workflows/tests.yml/badge.svg)](https://github.com/LudgerHentschel/unifiedig/actions/workflows/tests.yml)
 [![PyPI version](https://img.shields.io/pypi/v/unifiedig.svg)](https://pypi.org/project/unifiedig/)
 [![Python versions](https://img.shields.io/pypi/pyversions/unifiedig.svg)](https://pypi.org/project/unifiedig/)
-[![License](https://img.shields.io/pypi/l/unifiedig.svg)](LICENSE)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
 **Integrated Gradients prediction and loss attribution for a broad range of
 Python machine-learning models, through one interface.**
@@ -85,6 +85,9 @@ The same public API currently covers:
 
 ## Documentation
 
+- [The Integrated Gradients Stack](docs/ig-stack.md): how CBaseline, skgrad,
+  TreeIG, and UnifiedIG work together.
+
 - [How UnifiedIG works](docs/how-it-works.md): the fixed attribution
   functional, specialized solvers, numerical accuracy, performance design,
   and relationship to SHAP.
@@ -94,6 +97,24 @@ The same public API currently covers:
 
 The README introduces normal use. The linked documents explain the machinery
 without expanding the public API.
+
+## Installation
+
+Requires Python 3.10 or newer. Install UnifiedIG with pip:
+
+```console
+pip install unifiedig
+```
+
+This installs NumPy and scikit-learn together with UnifiedIG's lightweight
+supporting packages: CBaseline for constructing baseline distributions,
+skgrad for supported scikit-learn gradients, and TreeIG for tree-model
+attribution. No separate installation of these supporting packages is needed.
+
+UnifiedIG includes adapters for supported third-party frameworks but does not
+install those frameworks automatically. Users working with PyTorch, JAX,
+TensorFlow, CatBoost, XGBoost, LightGBM, or SHAP should install and manage the
+corresponding packages through their normal framework-specific workflow.
 
 ## Quick start
 
@@ -134,24 +155,6 @@ For a pandas `DataFrame`, Unified IG carries column labels into
 
 If one particular input is the intended starting point, pass it directly
 instead: `uig.Explainer(model, x0)`.
-
-## Installation
-
-Install UnifiedIG with pip:
-
-```console
-pip install unifiedig
-```
-
-This installs NumPy and scikit-learn together with UnifiedIG's lightweight
-supporting packages: CBaseline for constructing baseline distributions,
-skgrad for supported scikit-learn gradients, and TreeIG for tree-model
-attribution. No separate installation of these supporting packages is needed.
-
-UnifiedIG includes adapters for supported third-party frameworks but does not
-install those frameworks automatically. Users working with PyTorch, JAX,
-TensorFlow, CatBoost, XGBoost, LightGBM, or SHAP should install and manage the
-corresponding packages through their normal framework-specific workflow.
 
 ## One attribution mechanism
 
@@ -196,6 +199,27 @@ This is the central design boundary: model-specific code may accelerate the
 calculation, but it does not select a different path, background construction,
 or attribution game. See [How UnifiedIG works](docs/how-it-works.md) for the
 full methodology and performance discussion.
+
+## Original or transformed features
+
+For a fitted pipeline, select an attribution space explicitly:
+
+```python
+original = uig.Explainer(pipeline, baseline)(X)
+standardized = uig.Explainer(pipeline, baseline, attribute_after="scale")(X)
+components = uig.Explainer(pipeline, baseline, attribute_after="pca")(X)
+```
+
+Pass original observations and baselines in every call. UnifiedIG transforms
+both together, including weighted baseline rows. Results contain data and names
+for the selected features and record the boundary in `attribute_after`.
+Nested names such as `"preprocess__scale"` are supported. The same option is
+available on `LossExplainer`.
+
+Featurewise affine scaling preserves IG contributions; PCA, nonlinear
+transformations, and clipping can change the attribution question. See
+[choosing a feature space](docs/feature-spaces.md) and the
+[runnable comparison](examples/feature_spaces.py).
 
 ## Baselines and CBaseline
 
@@ -356,6 +380,9 @@ baseline-observation path rows processed in one analytic-gradient call. Larger
 batches can improve dense MLP throughput at the cost of temporary memory.
 
 ## Detailed current coverage
+
+See the [model/backend matrix](docs/supported-models.md) for dispatch, optional
+framework requirements, and unsupported cases.
 
 ### Exact attribution
 

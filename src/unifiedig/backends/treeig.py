@@ -1,4 +1,4 @@
-"""Thin adapter to the optional TreeIG package."""
+"""Thin adapter to the required TreeIG package."""
 
 from typing import Optional, Sequence
 
@@ -22,7 +22,7 @@ class TreeIGBackend:
 
     @staticmethod
     def _looks_like_supported_model(model: object) -> bool:
-        """Recognize likely TreeIG models when the optional package is absent."""
+        """Recognize likely TreeIG models when the required package is absent."""
         try:
             from sklearn.ensemble import (
                 ExtraTreesRegressor,
@@ -60,8 +60,8 @@ class TreeIGBackend:
             import treeig
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
-                "Tree support is optional. Install it with "
-                "`pip install unifiedig[trees]`."
+                "TreeIG is a required dependency. Repair the installation with "
+                "`pip install --upgrade unifiedig`."
             ) from exc
         if not treeig.supports(model):
             raise TypeError("TreeIGBackend received an unsupported model")

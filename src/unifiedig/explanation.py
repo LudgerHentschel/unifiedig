@@ -14,6 +14,8 @@ class Explanation:
 
     The field names intentionally mirror the useful subset of
     :class:`shap.Explanation`. Arrays use a leading sample dimension.
+    ``attribute_after`` records the chosen pipeline boundary (None for original
+    inputs); ``data`` and ``feature_names`` describe that selected space.
     """
 
     values: NDArray[np.floating]
@@ -22,8 +24,13 @@ class Explanation:
     feature_names: Optional[Sequence[str]] = None
     output_names: Optional[Sequence[str]] = None
     completeness_error: Optional[NDArray[np.floating]] = None
+    attribute_after: Optional[str] = None
 
     def __post_init__(self) -> None:
+        if self.attribute_after is not None and (
+            not isinstance(self.attribute_after, str) or not self.attribute_after
+        ):
+            raise ValueError("attribute_after must be None or a non-empty step name")
         values = np.asarray(self.values)
         data = np.asarray(self.data)
         base_values = np.asarray(self.base_values)
@@ -113,6 +120,7 @@ class Explanation:
             feature_names=self.feature_names,
             output_names=[f"{first_name} - {second_name}"],
             completeness_error=error,
+            attribute_after=self.attribute_after,
         )
 
     def _output_index(self, output: Any) -> int:

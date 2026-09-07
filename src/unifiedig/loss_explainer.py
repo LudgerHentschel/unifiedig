@@ -10,7 +10,6 @@ import numpy as np
 from ._loss import LossName, validate_targets
 from .backends.base import BackendResult
 from .baselines import (
-    normalize_inputs,
     normalize_jax_inputs,
     normalize_tensorflow_inputs,
     normalize_torch_inputs,
@@ -46,6 +45,9 @@ class LossExplainer:
     direction : {"loss_change", "loss_reduction"}, default="loss_change"
         Orientation of returned attribution values. The alternative reverses
         values only.
+    attribute_after : str, optional
+        Attribute after a named pipeline preprocessing step. Supply original
+        data and baselines; both are transformed together. None keeps inputs.
     n_steps : int, optional
         Gauss--Legendre nodes for numerical gradient backends. When omitted,
         loss attribution starts at 16 and may refine to 32 or 64.
@@ -64,6 +66,7 @@ class LossExplainer:
         baseline: Any,
         *,
         baseline_weights: Any | None = None,
+        attribute_after: str | None = None,
         loss: LossName = "squared_error",
         direction: Literal["loss_change", "loss_reduction"] = "loss_change",
         n_steps: int | None = None,
@@ -87,6 +90,7 @@ class LossExplainer:
             model,
             baseline,
             baseline_weights=baseline_weights,
+            attribute_after=attribute_after,
             n_steps=n_steps,
             check_completeness=check_completeness,
             completeness_atol=completeness_atol,
@@ -121,7 +125,7 @@ class LossExplainer:
     def __call__(self, data: Any, y: Any) -> Explanation:
         """Return observation-level feature attributions for realized loss."""
 
-        feature_names = self._explainer._feature_names(data)
+        feature_names = self._explainer._attribution_feature_names(data)
         normalized_data, baseline, weights, explanation_data = self._normalize(data)
         targets = np.asarray(y).reshape(-1)
         if len(targets) != len(explanation_data):
@@ -166,6 +170,7 @@ class LossExplainer:
             data=explanation_data,
             feature_names=feature_names,
             completeness_error=error,
+            attribute_after=self._explainer.attribute_after,
         )
 
     def _explain(
@@ -213,8 +218,6 @@ class LossExplainer:
             )
             explanation_data = normalized[0].numpy()
         else:
-            normalized = normalize_inputs(
-                data, self._explainer.baseline, self._explainer.baseline_weights
-            )
+            normalized = self._explainer._normalize_numpy_inputs(data)
             explanation_data = normalized[0]
         return *normalized, explanation_data

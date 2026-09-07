@@ -7,25 +7,25 @@ name = "unifiedig"
 version = "0.1.1.dev1"
 description = "A unified, model-agnostic interface for Integrated Gradients"
 readme = "README.md"
-requires-python = ">=3.9"
-license = "MIT"
+requires-python = ">=3.10"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 authors = [{name = "Ludger Hentschel"}]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "cbaseline>=0.1.0",
+    "cbaseline>=0.1.2,<0.2",
     "numpy>=1.23",
     "scikit-learn>=1.2",
-    "skgrad>=0.1.1",
-    "treeig>=0.1.11",
+    "skgrad>=0.1.5,<0.2",
+    "treeig>=0.2.0,<0.3",
 ]
 
 [project.optional-dependencies]
@@ -33,15 +33,15 @@ shap = ["shap>=0.42"]
 torch = ["torch>=2.0"]
 jax = ["jax>=0.4"]
 tensorflow = ["tensorflow>=2.16"]
-trees = ["treeig>=0.1.11"]
-catboost = ["catboost>=1.2", "treeig>=0.1.11"]
+trees = ["treeig>=0.2.0,<0.3"]
+catboost = ["catboost>=1.2", "treeig>=0.2.0,<0.3"]
 all = [
     "catboost>=1.2",
     "jax>=0.4",
     "shap>=0.42",
     "tensorflow>=2.16",
     "torch>=2.0",
-    "treeig>=0.1.11",
+    "treeig>=0.2.0,<0.3",
 ]
 test = [
     "build>=1",

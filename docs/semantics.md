@@ -194,3 +194,12 @@ attribution is accurate.
 The separate numerical-tree control `tree_grid_size` defaults to 1,024 path
 intervals. Increasing it improves the chance of separating nearby tree
 crossings but increases model evaluations proportionally.
+
+## Attribution feature space
+
+The default explains the inputs of the supplied model object. For fitted
+pipelines, `attribute_after="step_name"` selects features after that step while
+still accepting original observations and baselines. Data, names, and feature
+axes in the Explanation all refer to the selected space; `attribute_after`
+records the choice. See [feature-space selection](feature-spaces.md) for path,
+weighting, scaling, and nonlinear-transformation conventions.

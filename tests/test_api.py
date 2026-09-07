@@ -122,7 +122,7 @@ def test_empty_data_batch_is_rejected():
         uig.Explainer(model, [0.0, 0.0])(np.empty((0, 2)))
 
 
-def test_missing_tree_extra_has_actionable_error(monkeypatch):
+def test_missing_tree_dependency_has_actionable_error(monkeypatch):
     model = DecisionTreeRegressor(random_state=0).fit(np.eye(2), np.array([1.0, 2.0]))
     real_import = builtins.__import__
 
@@ -132,7 +132,7 @@ def test_missing_tree_extra_has_actionable_error(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", without_treeig)
-    with pytest.raises(ImportError, match=r"unifiedig\[trees\]"):
+    with pytest.raises(ImportError, match=r"pip install --upgrade unifiedig"):
         uig.Explainer(model, [0.0, 0.0])
 
 
