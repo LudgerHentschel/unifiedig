@@ -29,6 +29,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+docs = [
+    "sphinx>=7,<9",
+    "myst-parser>=3,<5",
+    "pydata-sphinx-theme>=0.16,<0.17",
+    "tomli>=2; python_version < '3.11'",
+]
+
 shap = ["shap>=0.42"]
 torch = ["torch>=2.0"]
 jax = ["jax>=0.4"]
@@ -54,6 +61,7 @@ test = [
 ]
 
 [project.urls]
+Documentation = "https://ludgerhentschel.github.io/unifiedig/"
 Homepage = "https://github.com/LudgerHentschel/unifiedig"
 Repository = "https://github.com/LudgerHentschel/unifiedig"
 Issues = "https://github.com/LudgerHentschel/unifiedig/issues"

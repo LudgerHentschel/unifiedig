@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add a Sphinx/MyST documentation site with the shared PyData theme, full
+  navigation, runnable examples, API reference, and GitHub Pages workflow.
+- Link the documentation prominently from the README and package metadata.
+
 - Standardize the license and package metadata to BSD-3-Clause.
 - Require Python 3.10+, CBaseline 0.1.2, skgrad 0.1.5, and TreeIG 0.2.0;
   bound the pre-1.0 backend dependencies to their tested minor series.

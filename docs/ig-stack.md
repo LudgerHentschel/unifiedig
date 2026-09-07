@@ -29,5 +29,5 @@ combine a score gradient with a probability-valued baseline prediction.
   evaluate analytic gradients, including supported preprocessing pipelines.
 - [TreeIG documentation](https://ludgerhentschel.github.io/treeig/):
   compute Integrated Gradients for supported tree models.
-- [UnifiedIG guide](https://github.com/LudgerHentschel/unifiedig/blob/main/docs/how-it-works.md):
+- [UnifiedIG guide](https://ludgerhentschel.github.io/unifiedig/):
   select the attribution backend through a common interface.

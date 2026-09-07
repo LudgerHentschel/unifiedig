@@ -1,14 +1,31 @@
 # Unified IG
 
+[![Documentation](https://img.shields.io/badge/docs-user%20guide-blue.svg)](https://ludgerhentschel.github.io/unifiedig/)
+
 [![Tests](https://github.com/LudgerHentschel/unifiedig/actions/workflows/tests.yml/badge.svg)](https://github.com/LudgerHentschel/unifiedig/actions/workflows/tests.yml)
 [![PyPI version](https://img.shields.io/pypi/v/unifiedig.svg)](https://pypi.org/project/unifiedig/)
 [![Python versions](https://img.shields.io/pypi/pyversions/unifiedig.svg)](https://pypi.org/project/unifiedig/)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
-**Integrated Gradients prediction and loss attribution for a broad range of
-Python machine-learning models, through one interface.**
+**Fast Integrated Gradients feature attribution for the most common Python
+machine learning models, including tree models, with a familiar API and a
+convenient path to SHAP plotting tools.**
 
-> **UnifiedIG customizes the solver, not the estimand.**
+UnifiedIG brings three capabilities together:
+
+1. **One familiar API, including trees.** Explain supported linear models,
+   pipelines, neural networks, and tree ensembles through the same interface.
+   TreeIG brings tree models into the IG framework by accounting for prediction
+   jumps at split boundaries.
+2. **Fast attribution from model structure.** Native autograd, skgrad's analytic
+   derivatives, and TreeIG's exact split-crossing calculations use the information
+   each model makes available. Exact shortcuts avoid unnecessary integration;
+   specialized gradients avoid expensive numerical differentiation.
+3. **Coherent reference distributions.** CBaseline constructs distributions of
+   observed inputs localized around a chosen reference prediction and calibrates
+   their weighted output to that reference. Explain against a meaningful
+   reference population, with every path contributing to the same prediction
+   contrast.
 
 Give Unified IG a fitted model and a reference background. Unified IG selects
 the appropriate implementation and returns one consistent explanation object.
@@ -20,21 +37,9 @@ explainer = uig.Explainer(model, background)
 explanation = explainer(X)
 ```
 
-That is the standard user experience. There are no model-specific explainer
-classes to choose and no gradient backend to configure.
-
-Across linear models, polynomial pipelines, neural networks, and trees, the
-attribution definition and baseline semantics stay fixed. UnifiedIG changes
-only the internal calculation used to make that definition fast and accurate.
-
-Use UnifiedIG when you want:
-
-- one attribution methodology across different fitted model classes;
-- an explicit single baseline or shared weighted baseline distribution;
-- exact structural shortcuts and native gradients where they are available;
-- automatic numerical accuracy checks without model-specific configuration;
-  and
-- a small API whose returned values can still use SHAP's plotting ecosystem.
+The API stays familiar while the calculation adapts to the model. Learn
+[how trees and fast gradients make this work](docs/how-it-works.md) and
+[how localized baseline distributions define the reference](docs/baselines.md).
 
 The result contains feature attributions, baseline values, input data, labels,
 and a completeness diagnostic:
@@ -59,7 +64,9 @@ shap.plots.waterfall(shap_values[0])
 shap.plots.bar(shap_values)
 ```
 
-Unified IG deliberately has no plotting subsystem of its own.
+See the **[SHAP plotting guide](https://ludgerhentschel.github.io/unifiedig/plotting.html)**
+for a complete example, a visual gallery, multiclass contrasts, and saving
+figures. The plotted values remain Integrated Gradients contributions.
 
 ## Broad model coverage
 
@@ -84,6 +91,10 @@ The same public API currently covers:
   explicit numerical fallback.
 
 ## Documentation
+
+**[Read the full documentation](https://ludgerhentschel.github.io/unifiedig/)** —
+installation, worked examples, baselines, classification and loss interpretation,
+model coverage, numerical controls, and the API reference.
 
 - [The Integrated Gradients Stack](docs/ig-stack.md): how CBaseline, skgrad,
   TreeIG, and UnifiedIG work together.
@@ -589,6 +600,16 @@ known tree and nearest-neighbor families are rejected rather than assigned
 misleading attributions.
 
 ## Explanation semantics
+
+**For classification, UnifiedIG attributes scores, not probabilities.** Binary
+outputs use margins or logits; multiclass outputs use centered scores that
+preserve every pairwise class margin. We recommend against
+probability attribution for explaining classification decisions: probability
+links compress and couple score changes, obscuring the score contributions
+that UnifiedIG is designed to explain.
+Baselines and completeness checks use the same score scale. See
+[why classification attribution uses scores](https://ludgerhentschel.github.io/unifiedig/classification.html)
+for the derivation, model-specific conventions, and probability-only trees.
 
 For every scalar-output explanation, Unified IG targets
 

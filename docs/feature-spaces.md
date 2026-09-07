@@ -78,6 +78,6 @@ losses = uig.LossExplainer(
 )(X, y)
 ```
 
-The [runnable example](../examples/feature_spaces.py) compares original,
+The [runnable example](examples.md#pipeline-feature-spaces) compares original,
 standardized, and PCA-component attributions and verifies completeness for all
 three. This feature requires skgrad 0.1.5 or later.

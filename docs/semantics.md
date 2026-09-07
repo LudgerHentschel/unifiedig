@@ -53,8 +53,13 @@ when available, identify the final axis.
 
 ## Explained output
 
+**Classification completeness is on the score scale, never the probability
+scale.** A decision margin is a logit only when the model defines it as one.
+See [classification scores](classification.md) for the rationale and the
+distinction from the mathematically different probability-IG question.
+
 Regression backends explain the model prediction. Binary classification
-backends explain the decision score (logit), with the positive class as the
+backends explain a decision margin or logit, with the positive class as the
 named output. If a model returns two raw binary scores, Unified IG explains
 their difference, `score[1] - score[0]`.
 

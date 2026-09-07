@@ -2,9 +2,10 @@
 
 ## Current prerequisites
 
-- Publish skgrad 0.1.5 or a compatible newer 0.1.x version before UnifiedIG.
+- Ensure the required skgrad version is available on PyPI before UnifiedIG.
   The feature-space API requires `pipeline_view`; do not lower the requirement
-  to bypass installation failures. PyPI had only skgrad 0.1.1 at the 2026-09-07 audit.
+  to bypass installation failures. The initial skgrad 0.1.5 availability blocker
+  was resolved before the successful UnifiedIG trial CI run.
 - Run CI against published dependencies. Local sibling package validation is
   useful but does not demonstrate a successful public one-install workflow.
 - Replace `0.1.1.dev1` with the intended release version in `pyproject.toml`,
@@ -30,6 +31,12 @@ fresh wheel installation before the OIDC publishing job can run.
 When explicitly authorized to publish, create the matching tag and GitHub
 release after CI passes. This workflow intentionally leaves version selection,
 release creation, PyPI publication, and repository visibility to the maintainer.
+
+## Documentation site
+
+The separate Documentation workflow builds and deploys GitHub Pages from
+`main`, without requiring a package version tag. See [building the documentation](building.md)
+for Pages settings and manually rerunning deployment after enabling Pages.
 
 ## Dependency policy
 

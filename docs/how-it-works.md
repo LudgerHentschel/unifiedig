@@ -4,15 +4,53 @@ UnifiedIG has one organizing principle:
 
 > **Customize the solver, not the estimand.**
 
-Every supported model is explained with the same Integrated Gradients
-functional, the same interpretation of a baseline distribution, and the same
-output conventions. UnifiedIG changes only the machinery used to evaluate
-that functional efficiently.
+For a chosen attribution question, every supported model is explained with
+the same Integrated Gradients functional, baseline-distribution interpretation,
+and output conventions. UnifiedIG changes the machinery used to evaluate that
+functional efficiently. Choosing prediction versus loss attribution changes
+the function being explained; switching model backends does not choose the
+question for you.
 
 This separation matters. A model-specific algorithm can be much faster than a
 generic implementation without changing what an attribution means. It also
 makes attributions comparable across model classes: a linear model, a neural
 network, and a tree ensemble are evaluated under the same attribution question.
+
+## How the three capabilities fit together
+
+**A common interface** separates the attribution definition from model-specific
+computation. The model determines which supported backend evaluates the path;
+the user supplies the output question and the reference distribution.
+
+**Speed** comes from using the structure already available in a fitted model.
+skgrad evaluates analytic derivatives, native frameworks use automatic
+differentiation, and affine or polynomial structure can make integration exact
+with very little work. TreeIG locates split crossings directly for its supported
+structural parsers. The numerical fallbacks cover additional cases, with their
+own cost and accuracy limits; there is no claim of one speedup factor for every
+model and workload.
+
+**Coherent baselines** come from defining the reference distribution explicitly.
+CBaseline localizes observed inputs in prediction space and calibrates their
+weighted output to a chosen reference. UnifiedIG uses that distribution to
+average paths, preserving its weights and reference-output meaning across
+backends. See [baselines](baselines.md) for how this differs from choosing one
+point or a broad uncalibrated background sample.
+
+## Why trees can be included
+
+A tree's prediction is constant inside a leaf and jumps at a split. Ordinary
+input gradients are zero away from those jumps, so sampling them along a path
+misses the prediction change. TreeIG accounts explicitly for the changes where
+the path crosses split boundaries. This extends the path attribution calculation
+to discontinuous tree outputs; it is not ordinary smooth autograd applied to a
+tree.
+
+For supported exact parsers, structural information identifies the crossings.
+For the explicit numerical-tree fallback, crossings must instead be detected
+approximately. Both fit the shared baseline-to-observation interface, but their
+accuracy guarantees differ. The [model matrix](supported-models.md) makes that
+distinction explicit.
 
 ## The attribution question
 
@@ -63,6 +101,24 @@ there is no unique inverse from `f0` to a feature baseline. UnifiedIG does not
 invent one. CBaseline constructs a weighted distribution of observed inputs
 whose mean model prediction equals `f0`; that object can be passed directly to
 `uig.Explainer`.
+
+## Prediction and loss use the same path construction
+
+The equations above explain the prediction function `f`. To explain loss for
+observation `i`, substitute `g_i(x) = loss(y_i, f(x))`, holding `y_i` fixed along
+every baseline-to-observation path. The weighted path definition and
+completeness identity are unchanged; they now reconstruct loss rather than a
+prediction or class score.
+
+For smooth models, the loss derivative composes with the model Jacobian through
+the chain rule at each integration node. For trees, the structural calculation
+accounts for loss changes at the same split crossings. The baseline values
+become target-specific mean losses, so even a shared baseline population may
+produce different reference losses across observations.
+
+This is why the two questions can share most computational machinery while
+having different interpretations. See [loss attribution](loss.md) for the
+prediction-versus-loss comparison, a numerical example, and support limits.
 
 ## What remains fixed
 
@@ -220,6 +276,11 @@ higher fixed node count. Numerical tree fallbacks should similarly be checked
 at a larger path-grid resolution.
 
 ## Output semantics
+
+For classification, the explained quantity is a score contrast. Sigmoid and
+softmax links change the derivatives along the path and therefore the function
+being attributed. The [classification guide](classification.md) derives this
+difference and explains centering, baseline calibration, and derived tree scores.
 
 Attributions are meaningful only after fixing the model output being
 decomposed. UnifiedIG uses explicit, consistent conventions:

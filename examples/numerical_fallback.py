@@ -1,7 +1,8 @@
-"""Explain an RBF support-vector regressor with numerical gradients."""
+"""Explain a Gaussian-process regressor with numerical gradients."""
 
 import numpy as np
-from sklearn.svm import SVR
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF
 
 from cbaseline import background
 import unifiedig as uig
@@ -10,7 +11,9 @@ import unifiedig as uig
 rng = np.random.default_rng(8)
 X = rng.normal(size=(80, 4))
 y = np.sin(X[:, 0]) + 0.5 * X[:, 1] ** 2 - X[:, 2]
-model = SVR(C=5.0, epsilon=0.01).fit(X, y)
+model = GaussianProcessRegressor(
+    kernel=RBF(1.2), alpha=1e-6, optimizer=None
+).fit(X, y)
 predictions = model.predict(X)
 f0 = float(predictions.mean())
 bg = background(
