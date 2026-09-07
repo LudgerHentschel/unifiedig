@@ -36,13 +36,14 @@ docs = [
     "tomli>=2; python_version < '3.11'",
 ]
 
-shap = ["shap>=0.42"]
+shap = ["shap>=0.42", "matplotlib>=3.6"]
 torch = ["torch>=2.0"]
 jax = ["jax>=0.4"]
 tensorflow = ["tensorflow>=2.16"]
 trees = ["treeig>=0.2.0,<0.3"]
 catboost = ["catboost>=1.2", "treeig>=0.2.0,<0.3"]
 all = [
+    "matplotlib>=3.6",
     "catboost>=1.2",
     "jax>=0.4",
     "shap>=0.42",

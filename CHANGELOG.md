@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Include Matplotlib in the `shap` and `all` extras so SHAP plotting examples
+  and documentation checks work in clean installations.
+
 - Add a Sphinx/MyST documentation site with the shared PyData theme, full
   navigation, runnable examples, API reference, and GitHub Pages workflow.
 - Link the documentation prominently from the README and package metadata.
