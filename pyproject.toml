@@ -40,8 +40,7 @@ shap = ["shap>=0.42", "matplotlib>=3.6"]
 torch = ["torch>=2.0"]
 jax = ["jax>=0.4"]
 tensorflow = ["tensorflow>=2.16"]
-trees = ["treeig>=0.2.0,<0.3"]
-catboost = ["catboost>=1.2", "treeig>=0.2.0,<0.3"]
+catboost = ["catboost>=1.2"]
 all = [
     "matplotlib>=3.6",
     "catboost>=1.2",
@@ -49,7 +48,6 @@ all = [
     "shap>=0.42",
     "tensorflow>=2.16",
     "torch>=2.0",
-    "treeig>=0.2.0,<0.3",
 ]
 test = [
     "build>=1",

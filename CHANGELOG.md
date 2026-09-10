@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Lead the README and documentation landing page with the Aumann-Shapley
+  framing: one estimand across model families, contrasted with per-family
+  dispatch, and a new "Discrete and continuous value theory" section.
+- Cite Aumann and Shapley (1974) and Sundararajan, Taly and Yan (2017) for the
+  underlying value theory, the TreeIG paper for the distributional extension to
+  piecewise-constant models, and the Canonical Integrated Gradients paper for
+  the reference distribution.
+- Add a references and citation page with the stack papers, value-theory and
+  Shapley bibliography, and BibTeX entries.
+- Remove the `trees` extra and drop `treeig` from the `catboost` and `all`
+  extras. TreeIG is a core dependency, so those entries could never install
+  anything and implied that tree support was optional.
+
 ## 0.1.6 — 2026-09-07
 
 - Add `on_incomplete="warn"|"raise"` to prediction and loss explainers,

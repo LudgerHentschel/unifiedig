@@ -1,24 +1,20 @@
 # UnifiedIG documentation
 
-**Fast Integrated Gradients feature attribution for the most common Python
-machine learning models, including tree models, with a familiar API and a
-convenient path to SHAP plotting tools.**
+**Integrated Gradients is the Aumann–Shapley value. UnifiedIG computes it across
+the model families used in practice.**
 
-UnifiedIG brings three capabilities together:
+UnifiedIG computes one estimand across linear models, pipelines, SVMs, MLPs,
+gradient-boosted trees, random forests, PyTorch, JAX, and TensorFlow. It selects
+an exact route wherever model structure permits, avoiding both sampling and
+quadrature; reports the completeness residual per sample wherever it does not;
+and explains every model against an explicit, auditable reference distribution.
 
-1. **One familiar API, including trees.** Explain supported linear models,
-   pipelines, neural networks, and tree ensembles through the same interface.
-   TreeIG brings tree models into the IG framework by accounting for prediction
-   jumps at split boundaries.
-2. **Fast attribution from model structure.** Native autograd, skgrad's analytic
-   derivatives, and TreeIG's exact split-crossing calculations use the information
-   each model makes available. Exact shortcuts avoid unnecessary integration;
-   specialized gradients avoid expensive numerical differentiation.
-3. **Coherent reference distributions.** CBaseline constructs distributions of
-   observed inputs localized around a chosen reference prediction and calibrates
-   their weighted output to that reference. Explain against a meaningful
-   reference population, with every path contributing to the same prediction
-   contrast.
+Other attribution libraries typically dispatch to a different algorithm per
+model family. In SHAP, tree models use TreeSHAP, neural networks use DeepSHAP,
+and the remainder use KernelSHAP. These estimate different quantities under
+different assumptions, so attributions from different explainers are not
+directly comparable: an apparent disagreement between two models may reflect the
+explainers rather than the models.
 
 Give UnifiedIG a fitted model and a reference background:
 
@@ -35,6 +31,31 @@ SHAP's waterfall, beeswarm, bar, and scatter plots.
 Read [how the computation works](how-it-works.md) for the tree and gradient
 machinery, and [baselines and CBaseline](baselines.md) for the reference
 distribution. The same prediction-attribution interface brings them together.
+
+## Discrete and continuous value theory
+
+The Shapley value is the unique attribution satisfying efficiency, symmetry,
+dummy, and additivity for cooperative games with a finite player set. Continuous
+features are not a finite player set. Applying the discrete theory to them
+requires a value function $v(S)$ specifying the model output when a subset of
+features is absent — a modeling choice the axioms do not determine, with
+conditional and interventional conventions yielding different answers — followed
+by an approximation over $2^p$ coalitions.
+
+The corresponding theory for non-atomic games yields the Aumann–Shapley value,
+which for differentiable $F$ is the integral of $\nabla F$ along the
+straight-line path (Aumann and Shapley, 1974; Sundararajan, Taly and Yan, 2017).
+Read distributionally, that integral is defined for piecewise-constant $F$ as
+well, where $\nabla F$ carries an impulse at each split boundary
+([Hentschel, 2026b](references.md)).
+Tree ensembles therefore belong inside the same theory rather than requiring a
+separate method.
+
+The construction requires a reference distribution and a path. Both are stated
+explicitly — the reference constructed from observed data to a chosen output
+$f_0$ ([Hentschel, 2026a](references.md)), the path fixed by symmetry
+(Friedman, 2004) — and the cost is linear in the number of path nodes rather
+than exponential in the number of features.
 
 ## Explain your first model
 
@@ -89,6 +110,7 @@ ig-stack
 :caption: Reference and development
 
 api
+references
 releases
 roadmap
 building
