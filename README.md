@@ -7,12 +7,6 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/unifiedig.svg)](https://pypi.org/project/unifiedig/)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
-UnifiedIG is a Python package for Integrated Gradients feature attribution
-across supported scikit-learn, tree, PyTorch, JAX, and TensorFlow/Keras models.
-Install and import it as `unifiedig`. Given a fitted model, a reference baseline
-or background distribution, and observations, it returns feature contributions,
-baseline outputs, and completeness diagnostics.
-
 **Integrated Gradients is the Aumann–Shapley value. UnifiedIG computes it across
 the model families used in practice.**
 
