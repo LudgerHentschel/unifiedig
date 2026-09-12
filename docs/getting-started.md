@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: "Install UnifiedIG and run a complete feature attribution example with a fitted Ridge model and a calibrated CBaseline reference distribution."
+---
+
 # Getting started
 
 ## Install once

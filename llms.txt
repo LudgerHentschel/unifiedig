@@ -1,0 +1,45 @@
+# UnifiedIG
+
+> UnifiedIG (`unifiedig`) is a Python package for Integrated Gradients feature attribution across supported scikit-learn, tree, PyTorch, JAX, and TensorFlow/Keras models. It returns feature contributions, baseline outputs, and completeness diagnostics through a common interface.
+
+Install with `pip install unifiedig` (Python 3.10+). CBaseline, skgrad, and TreeIG install as dependencies; model frameworks are installed separately. Import with `import unifiedig as uig`. The primary call is `uig.Explainer(model, baseline)(X)`.
+
+A baseline vector specifies one reference point; a matrix specifies a shared reference distribution. CBaseline backgrounds supply rows and weights directly. Regression explains model predictions. Classification uses scores or logits, with centered multiclass scores; framework callers must supply the intended score output. For scalar tabular outputs, `explanation.values` has shape `(samples, features)`.
+
+Exact routes depend on model structure and parser support. Smooth numerical integration and explicitly enabled fallbacks are distinct from exact routes. Inputs must permit numeric interpolation. Completeness checks reconstruction from the weighted baseline output plus summed contributions; a small residual alone does not guarantee accurate individual feature allocations. Consult the model matrix and numerical guide before selecting a route.
+
+The following HTML guides contain expanded examples and generated API documentation. Raw Sphinx Markdown sources can contain unexpanded inclusion directives.
+
+## Start here
+
+- [Installation and complete quickstart](https://ludgerhentschel.github.io/unifiedig/getting-started.html): Fit a model, construct a reference distribution, and verify prediction reconstruction.
+- [Models and backends](https://ludgerhentschel.github.io/unifiedig/supported-models.html): Supported estimators, exact versus numerical routes, explicit fallback options, and framework dependencies.
+- [Baselines and CBaseline](https://ludgerhentschel.github.io/unifiedig/baselines.html): Reference points, distributions, weights, and classification scale alignment.
+- [Output semantics](https://ludgerhentschel.github.io/unifiedig/semantics.html): Input and output shapes, target conventions, baseline handling, and numerical rules.
+- [Classification](https://ludgerhentschel.github.io/unifiedig/classification.html): Binary margins, centered multiclass scores, and pairwise contrasts.
+
+## Examples and reference
+
+- [Worked examples](https://ludgerhentschel.github.io/unifiedig/examples.html): Complete expanded Python examples for regression, classification, pipelines, and fallback.
+- [Quickstart Python source](https://raw.githubusercontent.com/ludgerhentschel/unifiedig/main/examples/quickstart.py): Standalone executable regression example.
+- [API reference](https://ludgerhentschel.github.io/unifiedig/api.html): Rendered constructors, parameters, methods, explanation objects, and framework adapters.
+- [Accuracy and troubleshooting](https://ludgerhentschel.github.io/unifiedig/numerical.html): Completeness diagnostics and refinement of approximate routes.
+- [Feature spaces](https://ludgerhentschel.github.io/unifiedig/feature-spaces.html): Original and transformed pipeline coordinates.
+- [Framework adapters](https://ludgerhentschel.github.io/unifiedig/frameworks.html): PyTorch, JAX, TensorFlow, and Keras integration.
+- [Plotting](https://ludgerhentschel.github.io/unifiedig/plotting.html): Convert results for SHAP plotting while retaining Integrated Gradients values.
+- [Loss attribution](https://ludgerhentschel.github.io/unifiedig/loss.html): Explain loss contrasts with observed targets through LossExplainer.
+
+## Related projects
+
+- [Integrated Gradients stack](https://ludgerhentschel.github.io/unifiedig/ig-stack.html): How the packages compose and when to use each directly.
+- [CBaseline](https://ludgerhentschel.github.io/cbaseline/): Empirical reference distributions for IG, SHAP, and compatible attribution methods.
+- [TreeIG](https://ludgerhentschel.github.io/treeig/): Direct tree-path attribution for supported models, with separate exact and numerical interfaces.
+- [skgrad](https://ludgerhentschel.github.io/skgrad/): Analytic input gradients and Jacobians for supported fitted scikit-learn models.
+
+## Development and methodology
+
+- [Repository](https://github.com/ludgerhentschel/unifiedig): Source code, examples, tests, and contribution materials.
+- [Releases](https://ludgerhentschel.github.io/unifiedig/releases.html): Release history and compatibility notes.
+- [Methodology](https://ludgerhentschel.github.io/unifiedig/how-it-works.html): Backend selection and path integration.
+- [References and citation](https://ludgerhentschel.github.io/unifiedig/references.html): Supporting papers and citation information.
+- [Documentation build](https://ludgerhentschel.github.io/unifiedig/building.html): Build and validate the documentation and discovery files.

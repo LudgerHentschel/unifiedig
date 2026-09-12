@@ -1,4 +1,10 @@
-# Unified IG semantics
+---
+myst:
+  html_meta:
+    description: "Understand UnifiedIG input shapes, baseline weights, output axes, classification scores, and numerical integration conventions."
+---
+
+# UnifiedIG semantics
 
 This document fixes the conventions that every backend must follow. The public
 API remains independent of model family:
@@ -15,14 +21,14 @@ structured single-array inputs with any shape `(samples, ...)`. A baseline may
 be a scalar, one sample, or a baseline distribution with shape
 `(baselines, ...)`. Optional `baseline_weights` must align with its rows. A
 background object exposing `rows` and `weights`, including a CBaseline
-`Background`, may be passed directly. Unified IG—not individual backends—
+`Background`, may be passed directly. UnifiedIG—not individual backends—
 validates and normalizes the distribution.
 
-Every input is attributed from the same baseline distribution. Unified IG
+Every input is attributed from the same baseline distribution. UnifiedIG
 averages its Integrated Gradients paths over the distribution; it never infers
 row pairing from equal input and baseline counts. Matrix rows receive equal
 weight by default. Explicit weights must be finite and nonnegative with a
-positive sum; Unified IG normalizes them to sum to one.
+positive sum; UnifiedIG normalizes them to sum to one.
 
 For normalized weights `w_b`, the explanation averages complete paths:
 
@@ -60,11 +66,11 @@ distinction from the mathematically different probability-IG question.
 
 Regression backends explain the model prediction. Binary classification
 backends explain a decision margin or logit, with the positive class as the
-named output. If a model returns two raw binary scores, Unified IG explains
+named output. If a model returns two raw binary scores, UnifiedIG explains
 their difference, `score[1] - score[0]`.
 
 For multiclass classification, let `z(x)` be the model's vector of `K` raw
-class scores. Unified IG explains the centered score vector
+class scores. UnifiedIG explains the centered score vector
 
 ```text
 s(x) = z(x) - mean(z(x) over classes).
@@ -88,11 +94,11 @@ sum_k base_values[i, k] = 0.
 
 `Explanation.contrast(a, b)` subtracts two stored coordinates to recover IG
 for the invariant pairwise margin `z_a - z_b`, without recomputing gradients
-or paths. Independent target-class attribution is not a separate Unified IG
+or paths. Independent target-class attribution is not a separate UnifiedIG
 estimand. Probability attribution is intentionally excluded.
 
 Generic differentiable frameworks do not encode whether a vector output is a
-class-score vector or a multi-output regression prediction. Unified IG treats
+class-score vector or a multi-output regression prediction. UnifiedIG treats
 vector-valued PyTorch, JAX, and TensorFlow outputs as class scores by default.
 Pass `output_kind="regression"` to preserve independent regression outputs
 without binary differencing or multiclass centering. Known sklearn and tree
@@ -139,7 +145,7 @@ score_k = log(p_k) - mean(log(p) over classes).
 ```
 
 The multiclass object is therefore centered and pairwise contrasts are log
-odds. Because tree probabilities may be exactly zero, Unified IG raises when
+odds. Because tree probabilities may be exactly zero, UnifiedIG raises when
 the logarithm is not finite unless `probability_floor` was supplied explicitly.
 When supplied, each probability is floored and the vector is renormalized;
 completeness refers to that explicitly smoothed score function.
@@ -154,7 +160,7 @@ configured with `completeness_atol`, `completeness_rtol`, and
 ## Numerical integration
 
 Numerical backends use Gauss–Legendre quadrature on the unit path interval.
-When `n_steps` is omitted, Unified IG starts with 16 nodes and automatically
+When `n_steps` is omitted, UnifiedIG starts with 16 nodes and automatically
 retries with 32, then 64, if the completeness tolerance is not met. A successful
 higher resolution is retained by that explainer for later calls. Supplying
 `Explainer(..., n_steps=N)` disables this refinement and uses the requested
@@ -162,7 +168,7 @@ number of nodes; disabling completeness checking also disables refinement.
 
 More nodes usually improve accuracy but require proportionally more gradient
 evaluations. For a supported degree-`d` polynomial pipeline ending in an affine
-estimator, Unified IG caps the active resolution at `ceil(d / 2)`, which is
+estimator, UnifiedIG caps the active resolution at `ceil(d / 2)`, which is
 exact for the polynomial gradient along a straight path. An explicitly smaller
 value is not raised automatically.
 
@@ -181,7 +187,7 @@ functions must produce samplewise outputs: one scalar or one vector for each
 leading input row. By default, two class scores are reduced to their margin
 and three or more are centered under the multiclass convention above.
 
-When explicitly enabled with `fallback="finite_difference"`, Unified IG uses
+When explicitly enabled with `fallback="finite_difference"`, UnifiedIG uses
 central finite differences to approximate gradients for otherwise unsupported
 smooth sklearn estimators. The step for coordinate `j` is
 `finite_difference_step * max(1, abs(x_j))` at each path point. Perturbed rows

@@ -1,4 +1,16 @@
+---
+myst:
+  html_meta:
+    description: "UnifiedIG computes Integrated Gradients feature attributions across supported Python model families with explicit baselines and completeness diagnostics."
+---
+
 # UnifiedIG documentation
+
+UnifiedIG is a Python package for Integrated Gradients feature attribution
+across supported scikit-learn, tree, PyTorch, JAX, and TensorFlow/Keras models.
+Install and import it as `unifiedig`. Given a fitted model, a reference baseline
+or background distribution, and observations, it returns feature contributions,
+baseline outputs, and completeness diagnostics.
 
 **Integrated Gradients is the Aumann–Shapley value. UnifiedIG computes it across
 the model families used in practice.**
@@ -23,6 +35,13 @@ import unifiedig as uig
 
 explanation = uig.Explainer(model, background)(X)
 ```
+
+Check the [model/backend matrix](supported-models.md) before choosing a
+route. Classification explains scores or logits; multiclass scores are centered.
+Exactness depends on model structure, and numerical fallbacks require explicit
+opt-in. See [classification conventions](classification.md) and
+[accuracy checks](numerical.md). A small completeness residual checks
+reconstruction; it does not by itself establish accurate individual allocations.
 
 The result contains feature contributions, baseline outputs, and completeness
 diagnostics. [Convert it with `explanation.to_shap()`](plotting.md) to use
@@ -56,6 +75,18 @@ explicitly — the reference constructed from observed data to a chosen output
 $f_0$ ([Hentschel, 2026a](references.md)), the path fixed by symmetry
 (Friedman, 2004) — and the cost is linear in the number of path nodes rather
 than exponential in the number of features.
+
+## Related packages
+
+UnifiedIG combines [CBaseline](https://ludgerhentschel.github.io/cbaseline/)
+reference distributions, [TreeIG](https://ludgerhentschel.github.io/treeig/)
+tree-path attributions, and [skgrad](https://ludgerhentschel.github.io/skgrad/)
+analytic input derivatives. Use these packages directly when you need their
+individual capabilities; use UnifiedIG for the common attribution interface.
+See [the Integrated Gradients stack](ig-stack.md) for their relationships.
+
+For automated readers, [llms.txt](https://ludgerhentschel.github.io/unifiedig/llms.txt)
+links to the guides, complete examples, and rendered API reference.
 
 ## Explain your first model
 

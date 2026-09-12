@@ -1,4 +1,4 @@
-# Unified IG
+# UnifiedIG
 
 [![Documentation](https://img.shields.io/badge/docs-user%20guide-blue.svg)](https://ludgerhentschel.github.io/unifiedig/)
 
@@ -6,6 +6,12 @@
 [![PyPI version](https://img.shields.io/pypi/v/unifiedig.svg)](https://pypi.org/project/unifiedig/)
 [![Python versions](https://img.shields.io/pypi/pyversions/unifiedig.svg)](https://pypi.org/project/unifiedig/)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+
+UnifiedIG is a Python package for Integrated Gradients feature attribution
+across supported scikit-learn, tree, PyTorch, JAX, and TensorFlow/Keras models.
+Install and import it as `unifiedig`. Given a fitted model, a reference baseline
+or background distribution, and observations, it returns feature contributions,
+baseline outputs, and completeness diagnostics.
 
 **Integrated Gradients is the Aumann–Shapley value. UnifiedIG computes it across
 the model families used in practice.**
@@ -29,36 +35,12 @@ import unifiedig as uig
 explanation = uig.Explainer(model, background)(X)
 ```
 
-## Discrete and continuous value theory
-
-The Shapley value is the unique attribution satisfying efficiency, symmetry,
-dummy, and additivity for cooperative games with a finite player set. Continuous
-features are not a finite player set. Applying the discrete theory to them
-requires a value function $v(S)$ specifying the model output when a subset of
-features is absent — a modeling choice the axioms do not determine, with
-conditional and interventional conventions yielding different answers — followed
-by an approximation over $2^p$ coalitions.
-
-The corresponding theory for non-atomic games yields the Aumann–Shapley value,
-which for differentiable $F$ is the integral of $\nabla F$ along the
-straight-line path (Aumann and Shapley, 1974; Sundararajan, Taly and Yan, 2017).
-Read distributionally, that integral is defined for piecewise-constant $F$ as
-well, where $\nabla F$ carries an impulse at each split boundary
-([Hentschel, 2026b](https://www.ludgerhentschel.com/PDFs/Hentschel%20'26g.pdf)).
-Tree ensembles therefore belong inside the same theory rather than requiring a
-separate method.
-
-The construction requires a reference distribution and a path. Both are stated
-explicitly — the reference constructed from observed data to a chosen output
-$f_0$
-([Hentschel, 2026a](https://www.ludgerhentschel.com/PDFs/Hentschel%20'26h.pdf)),
-the path fixed by symmetry (Friedman, 2004) — and the cost is linear in the
-number of path nodes rather than exponential in the number of features.
-
-Read the **[UnifiedIG documentation](https://ludgerhentschel.github.io/unifiedig/)**
-for the user guide, worked examples, and API reference, and
-[references and citation](https://ludgerhentschel.github.io/unifiedig/references.html)
-for the full bibliography.
+Check the [model/backend matrix](https://ludgerhentschel.github.io/unifiedig/supported-models.html) before choosing a
+route. Classification explains scores or logits; multiclass scores are centered.
+Exactness depends on model structure, and numerical fallbacks require explicit
+opt-in. See [classification conventions](https://ludgerhentschel.github.io/unifiedig/classification.html) and
+[accuracy checks](https://ludgerhentschel.github.io/unifiedig/numerical.html). A small completeness residual checks
+reconstruction; it does not by itself establish accurate individual allocations.
 
 ## Installation
 
@@ -105,7 +87,7 @@ np.testing.assert_allclose(
 )
 ```
 
-For a pandas `DataFrame`, Unified IG carries column labels into
+For a pandas `DataFrame`, UnifiedIG carries column labels into
 `explanation.feature_names`.
 
 If one particular input is the intended starting point, pass it directly
@@ -157,7 +139,40 @@ reconstructs the prediction. Inspect `explanation.max_abs_completeness_error`
 and follow the [accuracy guide](https://ludgerhentschel.github.io/unifiedig/numerical.html)
 when using numerical routes.
 
+## Discrete and continuous value theory
+
+The Shapley value is the unique attribution satisfying efficiency, symmetry,
+dummy, and additivity for cooperative games with a finite player set. Continuous
+features are not a finite player set. Applying the discrete theory to them
+requires a value function $v(S)$ specifying the model output when a subset of
+features is absent — a modeling choice the axioms do not determine, with
+conditional and interventional conventions yielding different answers — followed
+by an approximation over $2^p$ coalitions.
+
+The corresponding theory for non-atomic games yields the Aumann–Shapley value,
+which for differentiable $F$ is the integral of $\nabla F$ along the
+straight-line path (Aumann and Shapley, 1974; Sundararajan, Taly and Yan, 2017).
+Read distributionally, that integral is defined for piecewise-constant $F$ as
+well, where $\nabla F$ carries an impulse at each split boundary
+([Hentschel, 2026b](https://www.ludgerhentschel.com/PDFs/Hentschel%20'26g.pdf)).
+Tree ensembles therefore belong inside the same theory rather than requiring a
+separate method.
+
+The construction requires a reference distribution and a path. Both are stated
+explicitly — the reference constructed from observed data to a chosen output
+$f_0$
+([Hentschel, 2026a](https://www.ludgerhentschel.com/PDFs/Hentschel%20'26h.pdf)),
+the path fixed by symmetry (Friedman, 2004) — and the cost is linear in the
+number of path nodes rather than exponential in the number of features.
+
+Read the **[UnifiedIG documentation](https://ludgerhentschel.github.io/unifiedig/)**
+for the user guide, worked examples, and API reference, and
+[references and citation](https://ludgerhentschel.github.io/unifiedig/references.html)
+for the full bibliography.
+
 ## Explore the documentation
+
+For AI agents and other automated readers, [llms.txt](https://ludgerhentschel.github.io/unifiedig/llms.txt) provides a concise map to the guides, complete examples, and rendered API reference.
 
 | Topic | Guide |
 |---|---|
@@ -173,6 +188,20 @@ UnifiedIG also offers **[loss attribution](https://ludgerhentschel.github.io/uni
 when observed targets are available. `LossExplainer` explains which features
 raise or lower loss relative to the reference, using much of the same path
 machinery. It is an additional capability beyond prediction attribution.
+
+## Related projects
+
+UnifiedIG installs three companion packages and brings their roles together:
+
+| Package | Role and when to use it directly |
+|---|---|
+| [CBaseline](https://ludgerhentschel.github.io/cbaseline/) (`cbaseline`) | Construct empirical reference distributions for IG, SHAP, or other compatible attribution engines. |
+| [TreeIG](https://ludgerhentschel.github.io/treeig/) (`treeig`) | Compute tree-path attributions directly for supported tree models. |
+| [skgrad](https://ludgerhentschel.github.io/skgrad/) (`skgrad`) | Obtain analytic input gradients and Jacobians of supported fitted scikit-learn models. |
+
+Use UnifiedIG when you want the common attribution interface. See
+[the Integrated Gradients stack](https://ludgerhentschel.github.io/unifiedig/ig-stack.html)
+for how the packages compose and why their output scales must agree.
 
 ## Project information
 

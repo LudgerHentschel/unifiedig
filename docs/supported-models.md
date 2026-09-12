@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: "Check UnifiedIG model support, exact and numerical backends, optional framework installations, and classification output restrictions."
+---
+
 # Supported models and backend selection
 
 This matrix describes the release dependency series: skgrad 0.1.5+, TreeIG

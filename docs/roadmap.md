@@ -47,7 +47,7 @@ derivatives, quadrature nodes batched into each model pass, shared weighted
 backgrounds, scalar and vector outputs, and an explicit `TensorFlowModel`
 adapter for arbitrary prediction functions. TensorFlow-backed Keras models
 work directly. Keras 3 models configured for JAX or PyTorch reuse those native
-Unified IG backends instead of introducing a Keras-specific differentiation
+UnifiedIG backends instead of introducing a Keras-specific differentiation
 layer.
 
 ## Before the next published release

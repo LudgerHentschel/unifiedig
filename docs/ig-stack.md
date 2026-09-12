@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: "Choose between UnifiedIG, CBaseline, TreeIG, and skgrad and understand how reference distributions, tree paths, and gradients compose."
+---
+
 # The Integrated Gradients Stack
 
 | Package | Responsibility |

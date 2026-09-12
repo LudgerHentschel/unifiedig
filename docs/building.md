@@ -6,6 +6,7 @@ Use Python 3.12 for the documentation toolchain, matching CI:
 python -m pip install -e ".[docs,shap]"
 python scripts/check_docs_examples.py
 python -m sphinx -W --keep-going -b html docs docs/_build/html
+python scripts/check_docs_discovery.py
 ```
 
 Open `docs/_build/html/index.html` to preview the site. The site uses Sphinx,
@@ -40,3 +41,20 @@ the guide. Framework examples are checked when the relevant optional dependency
 is installed, including in the existing framework test jobs.
 
 For package publishing, use the separate [release checklist](releasing.md).
+
+## Discovery files and page descriptions
+
+Maintain the repository-root `llms.txt` as a short annotated guide to the
+published documentation. Sphinx copies this one source to the site root through
+`html_extra_path`; do not maintain a second copy in `docs/`. Prefer rendered API
+and example pages, because raw Sphinx sources may contain unexpanded directives.
+
+`sphinx-sitemap` generates `sitemap.xml` using `html_baseurl`. The URL scheme
+matches this unversioned site's actual paths. Add a concise `description` under
+`myst.html_meta` in important pages' YAML front matter. Canonical links continue
+to use the configured documentation base URL.
+
+The discovery check runs after the HTML build in CI. It checks the copied index,
+local index targets, sitemap paths, canonical links, descriptions, and expanded
+API and example content. After deployment, verify `/unifiedig/llms.txt` and
+`/unifiedig/sitemap.xml` on the public site and check external links in the index.

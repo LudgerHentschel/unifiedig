@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: "Check UnifiedIG completeness residuals, refine numerical integration, and troubleshoot attribution accuracy."
+---
+
 # Accuracy and troubleshooting
 
 ## Automatic integration

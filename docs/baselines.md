@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: "Choose a reference point or weighted background distribution for UnifiedIG and preserve CBaseline rows, weights, and output scales."
+---
+
 # Baselines and CBaseline
 
 A baseline defines the comparison in an attribution. Changing it changes the

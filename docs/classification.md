@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: "Interpret UnifiedIG binary margins, centered multiclass scores, and pairwise classification contrasts."
+---
+
 # Classification: attribute scores, not probabilities
 
 **UnifiedIG explains classification decisions on the score scale.** Binary

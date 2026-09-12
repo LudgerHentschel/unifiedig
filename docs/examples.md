@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: "Run complete UnifiedIG examples for regression, classification, feature spaces, and explicit numerical fallback."
+---
+
 # Worked examples
 
 These complete scripts run from the repository with `python examples/<name>.py`.

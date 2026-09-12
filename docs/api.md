@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: "Look up UnifiedIG Explainer, LossExplainer, Explanation, framework adapters, signatures, and public parameters."
+---
+
 # API reference
 
 The public interface consists of two explainers, an explanation container, and
