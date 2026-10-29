@@ -189,9 +189,9 @@ UnifiedIG installs three companion packages and brings their roles together:
 
 | Package | Role and when to use it directly |
 |---|---|
-| [CBaseline](https://ludgerhentschel.github.io/cbaseline/) (`cbaseline`) | Construct empirical reference distributions for IG, SHAP, or other compatible attribution engines. |
-| [TreeIG](https://ludgerhentschel.github.io/treeig/) (`treeig`) | Compute tree-path attributions directly for supported tree models. |
-| [skgrad](https://ludgerhentschel.github.io/skgrad/) (`skgrad`) | Obtain analytic input gradients and Jacobians of supported fitted scikit-learn models. |
+| [CBaseline](https://github.com/LudgerHentschel/cbaseline) (`cbaseline`) | Construct empirical reference distributions for IG, SHAP, or other compatible attribution engines. |
+| [TreeIG](https://github.com/LudgerHentschel/treeig) (`treeig`) | Compute tree-path attributions directly for supported tree models. |
+| [skgrad](https://github.com/LudgerHentschel/skgrad) (`skgrad`) | Obtain analytic input gradients and Jacobians of supported fitted scikit-learn models. |
 
 Use UnifiedIG when you want the common attribution interface. See
 [the Integrated Gradients stack](https://ludgerhentschel.github.io/unifiedig/ig-stack.html)
