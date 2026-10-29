@@ -61,10 +61,11 @@ test = [
 ]
 
 [project.urls]
-Documentation = "https://ludgerhentschel.github.io/unifiedig/"
 Homepage = "https://github.com/LudgerHentschel/unifiedig"
+Documentation = "https://ludgerhentschel.github.io/unifiedig/"
 Repository = "https://github.com/LudgerHentschel/unifiedig"
 Issues = "https://github.com/LudgerHentschel/unifiedig/issues"
+Changelog = "https://github.com/LudgerHentschel/unifiedig/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
